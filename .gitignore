@@ -1,0 +1,47 @@
+# OS and editor noise
+.DS_Store
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local scratch files
+cpo.zip
+dawid_skene.py
+notes.txt
+upool_analysis.md
+
+# Experiment outputs
+outputs/**/*.pkl
+outputs/**/*.csv
+
+# Ad-hoc exported figures at the top level
+/*.png
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.snm
+*.synctex.gz
+*.toc
+
+# LaTeX files
+latex/*.tex
+latex/*.sty
+report/*.tex
+
+
+# Keep deck source images tracked even though top-level PNGs are ignored
+!latex/images/*.png
+
+notes/
