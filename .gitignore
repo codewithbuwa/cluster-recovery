@@ -37,6 +37,8 @@ outputs/**/*.csv
 *.vrb
 
 # LaTeX files
+latex/
+report/
 latex/*.tex
 latex/*.sty
 report/*.tex
