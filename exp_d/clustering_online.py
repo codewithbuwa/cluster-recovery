@@ -7,33 +7,14 @@ from exp_d.clustering_soft import gmm_1d_soft
 
 
 def _match_components(new_centers: np.ndarray, previous_centers: np.ndarray | None) -> np.ndarray:
-    """Return old-index labels for each new component.
+    """Return stable component indices for 1-D signature clusters.
 
-    The project uses K<=2 in the online comparison, but this handles small K
-    generally by brute-force permutation search to avoid a SciPy dependency.
+    Components are ordered by their centers. The previous implementation tried
+    every permutation to match refits, which is factorial in K and stalls at
+    K=10. In this experiment the signature is one-dimensional, so sorted centers
+    are the natural stable indexing rule.
     """
-    n_clusters = len(new_centers)
-    if previous_centers is None:
-        return np.argsort(new_centers)
-
-    best_perm = None
-    best_cost = float("inf")
-    for perm in _permutations(np.arange(n_clusters)):
-        cost = float(np.sum((new_centers - previous_centers[np.asarray(perm)]) ** 2))
-        if cost < best_cost:
-            best_cost = cost
-            best_perm = np.asarray(perm, dtype=np.int64)
-    return best_perm
-
-
-def _permutations(values: np.ndarray):
-    if len(values) == 1:
-        yield values
-        return
-    for idx, value in enumerate(values):
-        rest = np.delete(values, idx)
-        for suffix in _permutations(rest):
-            yield np.concatenate(([value], suffix))
+    return np.argsort(new_centers)
 
 
 @dataclass
@@ -72,7 +53,7 @@ class OnlineHardClusterer:
 
     def refit(self, step: int) -> dict[str, object]:
         sig = self.signatures.values()
-        raw_labels = kmeans_1d(sig, self.n_clusters, self.seed + 100 * step)
+        raw_labels = kmeans_1d(sig, self.n_clusters, self.seed + 100 * step, init_centers=self.prev_centers)
         raw_centers = _centers_from_labels(sig, raw_labels, self.n_clusters)
         perm = _match_components(raw_centers, self.prev_centers)
         labels = perm[raw_labels]
@@ -94,20 +75,37 @@ class OnlineSoftClusterer:
         self.responsibilities = np.zeros((n_annotators, n_clusters), dtype=np.float64)
         self.responsibilities[:, 0] = 1.0
         self.prev_means: np.ndarray | None = None
+        self.prev_variances: np.ndarray | None = None
+        self.prev_weights: np.ndarray | None = None
 
     def observe(self, annotator: np.ndarray, desirable: np.ndarray) -> None:
         self.signatures.observe(annotator, desirable)
 
     def refit(self, step: int) -> dict[str, object]:
-        raw_w, info = gmm_1d_soft(self.signatures.values(), self.n_clusters, self.seed + 100 * step)
+        raw_w, info = gmm_1d_soft(
+            self.signatures.values(),
+            self.n_clusters,
+            self.seed + 100 * step,
+            init_means=self.prev_means,
+            init_variances=self.prev_variances,
+            init_weights=self.prev_weights,
+        )
         raw_means = info["means"]
+        raw_variances = info["variances"]
+        raw_weights = info["weights"]
         perm = _match_components(raw_means, self.prev_means)
         responsibilities = np.zeros_like(raw_w)
         responsibilities[:, perm] = raw_w
         means = np.zeros_like(raw_means)
         means[perm] = raw_means
+        variances = np.zeros_like(raw_variances)
+        variances[perm] = raw_variances
+        weights = np.zeros_like(raw_weights)
+        weights[perm] = raw_weights
         self.responsibilities = responsibilities
         self.prev_means = means
+        self.prev_variances = variances
+        self.prev_weights = weights
         return {"centers": means.copy(), "coverage": float(self.signatures.counts.mean())}
 
     def for_annotators(self, annotator: np.ndarray) -> np.ndarray:

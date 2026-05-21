@@ -37,6 +37,9 @@ def gmm_1d_soft(
     seed: int,
     max_iter: int = 200,
     tol: float = 1e-6,
+    init_means: np.ndarray | None = None,
+    init_variances: np.ndarray | None = None,
+    init_weights: np.ndarray | None = None,
 ) -> tuple[np.ndarray, dict]:
     """Fit a 1-D K-component Gaussian mixture by EM.
 
@@ -76,22 +79,44 @@ def gmm_1d_soft(
         }
         return responsibilities, info
 
-    # Initialise means with K-means hard labels (stable, deterministic).
-    initial_labels = kmeans_1d(signatures, n_clusters, seed)
-    means = np.zeros(n_clusters, dtype=np.float64)
-    variances = np.zeros(n_clusters, dtype=np.float64)
-    weights = np.zeros(n_clusters, dtype=np.float64)
-    for k in range(n_clusters):
-        mask = initial_labels == k
-        if not np.any(mask):
-            # Fall back to a quantile if K-means returned an empty cluster.
-            means[k] = float(np.quantile(signatures, (k + 1) / (n_clusters + 1)))
-            variances[k] = max(signatures.var(), _VAR_FLOOR)
-            weights[k] = 1.0 / n_clusters
-        else:
-            means[k] = float(signatures[mask].mean())
-            variances[k] = max(float(signatures[mask].var()), _VAR_FLOOR)
-            weights[k] = float(mask.mean())
+    if init_means is not None:
+        means = np.asarray(init_means, dtype=np.float64).copy()
+        variances = (
+            np.asarray(init_variances, dtype=np.float64).copy()
+            if init_variances is not None
+            else np.full(n_clusters, max(signatures.var(), _VAR_FLOOR), dtype=np.float64)
+        )
+        weights = (
+            np.asarray(init_weights, dtype=np.float64).copy()
+            if init_weights is not None
+            else np.full(n_clusters, 1.0 / n_clusters, dtype=np.float64)
+        )
+        if means.shape != (n_clusters,):
+            raise ValueError(f"init_means must have shape ({n_clusters},), got {means.shape}")
+        if variances.shape != (n_clusters,):
+            raise ValueError(f"init_variances must have shape ({n_clusters},), got {variances.shape}")
+        if weights.shape != (n_clusters,):
+            raise ValueError(f"init_weights must have shape ({n_clusters},), got {weights.shape}")
+        variances = np.maximum(variances, _VAR_FLOOR)
+        weight_sum = weights.sum()
+        weights = weights / weight_sum if weight_sum > 0 else np.full(n_clusters, 1.0 / n_clusters)
+    else:
+        # Initialise means with K-means hard labels (stable, deterministic).
+        initial_labels = kmeans_1d(signatures, n_clusters, seed)
+        means = np.zeros(n_clusters, dtype=np.float64)
+        variances = np.zeros(n_clusters, dtype=np.float64)
+        weights = np.zeros(n_clusters, dtype=np.float64)
+        for k in range(n_clusters):
+            mask = initial_labels == k
+            if not np.any(mask):
+                # Fall back to a quantile if K-means returned an empty cluster.
+                means[k] = float(np.quantile(signatures, (k + 1) / (n_clusters + 1)))
+                variances[k] = max(signatures.var(), _VAR_FLOOR)
+                weights[k] = 1.0 / n_clusters
+            else:
+                means[k] = float(signatures[mask].mean())
+                variances[k] = max(float(signatures[mask].var()), _VAR_FLOOR)
+                weights[k] = float(mask.mean())
 
     prev_log_likelihood = -np.inf
     log_likelihood = -np.inf

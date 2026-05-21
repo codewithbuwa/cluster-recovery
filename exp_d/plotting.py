@@ -530,6 +530,11 @@ def parse_online_variant_panel_args() -> argparse.Namespace:
         default=None,
         help="Original learned_clusters_results.pkl with KTO/random/oracle baselines.",
     )
+    parser.add_argument(
+        "--recompute",
+        action="store_true",
+        help="Re-run the Experiment D and online-variant flows instead of requiring existing caches.",
+    )
     return parser.parse_args()
 
 
@@ -552,11 +557,16 @@ def main_online_variant_panel() -> None:
     if base_cache_path.exists():
         with base_cache_path.open("rb") as f:
             base_payload = pickle.load(f)
-    else:
+    elif args.recompute:
         config = OnlineFlowConfig(output_dir=output_dir)
         base_payload = run_experiment_d(config)
         with base_cache_path.open("wb") as f:
             pickle.dump(base_payload, f)
+    else:
+        raise SystemExit(
+            f"Missing base cache: {base_cache_path}. "
+            f"Run exp_d/run.py once, or pass --recompute to regenerate it."
+        )
 
     from_cache = _repo_relative(args.from_cache) if args.from_cache is not None else cache_path
     used_existing_variant_cache = from_cache.exists()
@@ -564,10 +574,13 @@ def main_online_variant_panel() -> None:
         with from_cache.open("rb") as f:
             payload = pickle.load(f)
         print(f"Used variant cache: {from_cache}")
+    elif args.from_cache is not None:
+        raise SystemExit(f"Missing variant cache: {from_cache}")
     else:
         payload = run_online_variant_panel(OnlineFlowConfig(output_dir=output_dir))
         with cache_path.open("wb") as f:
             pickle.dump(payload, f)
+        print(f"Saved cache:  {cache_path}")
 
     for variant, figure_path in figure_paths.items():
         if variant == "all_ksweep":
@@ -577,5 +590,3 @@ def main_online_variant_panel() -> None:
     plot_all_algorithm_ksweep(base_payload, payload, figure_paths["all_ksweep"])
     print(f"Saved figure: {figure_paths['all_ksweep']}")
     print(f"Used base cache: {base_cache_path}")
-    if not used_existing_variant_cache:
-        print(f"Saved cache:  {cache_path}")

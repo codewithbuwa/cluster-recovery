@@ -14,17 +14,31 @@ def compute_signatures(dataset: OfflineDataset) -> np.ndarray:
     return signatures / np.maximum(counts, 1)
 
 
-def kmeans_1d(signatures: np.ndarray, n_clusters: int, seed: int) -> np.ndarray:
+def kmeans_1d(
+    signatures: np.ndarray,
+    n_clusters: int,
+    seed: int,
+    init_centers: np.ndarray | None = None,
+) -> np.ndarray:
     try:
         os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
         from sklearn.cluster import KMeans
 
-        return KMeans(n_clusters=n_clusters, random_state=seed, n_init=10).fit_predict(
+        if init_centers is None:
+            init = "k-means++"
+            n_init = 10
+        else:
+            init = np.asarray(init_centers, dtype=np.float64).reshape(n_clusters, 1)
+            n_init = 1
+        return KMeans(n_clusters=n_clusters, random_state=seed, init=init, n_init=n_init).fit_predict(
             signatures.reshape(-1, 1)
         ).astype(np.int64)
     except ImportError:
-        quantiles = np.linspace(0, 100, n_clusters + 2)[1:-1]
-        centers = np.percentile(signatures, quantiles)
+        if init_centers is None:
+            quantiles = np.linspace(0, 100, n_clusters + 2)[1:-1]
+            centers = np.percentile(signatures, quantiles)
+        else:
+            centers = np.asarray(init_centers, dtype=np.float64).copy()
         for _ in range(100):
             distances = np.abs(signatures[:, None] - centers[None, :])
             labels = distances.argmin(axis=1).astype(np.int64)

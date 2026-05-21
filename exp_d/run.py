@@ -27,6 +27,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run training and summary only; do not write the PNG figure.",
     )
+    parser.add_argument(
+        "--recompute",
+        action="store_true",
+        help="Re-run the experiment even if a cache already exists.",
+    )
     return parser.parse_args()
 
 
@@ -39,16 +44,21 @@ def main() -> None:
     cache_path = output_dir / "learned_clusters_results.pkl"
     figure_path = output_dir / "learned_clusters.png"
 
-    payload = run_experiment_d(config)
-    with cache_path.open("wb") as f:
-        pickle.dump(payload, f)
+    if cache_path.exists() and not args.recompute:
+        with cache_path.open("rb") as f:
+            payload = pickle.load(f)
+        print(f"Used cache: {cache_path}")
+    else:
+        payload = run_experiment_d(config)
+        with cache_path.open("wb") as f:
+            pickle.dump(payload, f)
+        print(f"Saved cache: {cache_path}")
 
     if not args.skip_plot:
         plot_experiment_d(payload, figure_path)
         latex_figure_path = copy_to_latex_images(figure_path)
 
     print(summarize(payload))
-    print(f"Saved cache: {cache_path}")
     if not args.skip_plot:
         print(f"Saved figure: {figure_path}")
         print(f"Saved LaTeX figure: {latex_figure_path}")
