@@ -174,7 +174,6 @@ def train_method(
         ref_cluster = cpo_cluster if method == "cpo" else np.zeros_like(true_cluster)
         policy = softmax(theta)
         rewards = np.log(policy[x, y]) + np.log(cfg.n_responses)
-        ref.update(rewards, x, ref_cluster, desirable, policy)
         z_i = ref.get(ref_cluster)
         if record_references:
             reference_logs.append(ref.z.copy())
@@ -183,6 +182,7 @@ def train_method(
         adam_m, adam_v = _adam_update(
             theta, grad, adam_m, adam_v, step + 1, train_config.learning_rate
         )
+        ref.update(rewards, x, ref_cluster, desirable, policy)
 
         if record_grad_weights:
             means = []
@@ -264,12 +264,12 @@ def train_offline_method(
 
         policy = softmax(theta)
         rewards = np.log(policy[x, y]) + np.log(cfg.n_responses)
-        ref.update(rewards, x, ref_cluster, desirable, policy)
         z_i = ref.get(ref_cluster)
         grad, _ = _loss_grad(theta, x, y, desirable, ref_cluster, z_i, train_config, cfg.n_responses)
         adam_m, adam_v = _adam_update(
             theta, grad, adam_m, adam_v, step + 1, train_config.learning_rate
         )
+        ref.update(rewards, x, ref_cluster, desirable, policy)
 
         if step % train_config.eval_every == 0:
             eval_steps.append(step)

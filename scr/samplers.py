@@ -4,36 +4,6 @@ from scr.config import WorldConfig
 from scr.world import SyntheticWorld
 
 
-class OnlineSampler:
-    def __init__(self, world: SyntheticWorld, seed: int):
-        self.world = world
-        self.config = world.config
-        self.rng = np.random.default_rng(seed + 10_000)
-
-    def sample(self, batch_size: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        cfg = self.config
-        x = self.rng.integers(0, cfg.n_prompts, size=batch_size)
-        y = self.rng.integers(0, cfg.n_responses, size=batch_size)
-        cluster = self.rng.binomial(1, 1.0 - cfg.pi_a, size=batch_size).astype(np.int64)
-        desirable = self.world.label(x, y, cluster, self.rng)
-        return x, y, desirable, cluster
-
-
-class OracleBobSampler:
-    def __init__(self, world: SyntheticWorld, seed: int):
-        self.world = world
-        self.config = world.config
-        self.rng = np.random.default_rng(seed + 50_000)
-
-    def sample(self, batch_size: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        cfg = self.config
-        x = self.rng.integers(0, cfg.n_prompts, size=batch_size)
-        y = self.rng.integers(0, cfg.n_responses, size=batch_size)
-        cluster = np.ones(batch_size, dtype=np.int64)
-        desirable = self.world.label(x, y, cluster, self.rng)
-        return x, y, desirable, cluster
-
-
 class OfflineDataset:
     def __init__(self, world: SyntheticWorld, config: WorldConfig, seed: int):
         self.config = config
