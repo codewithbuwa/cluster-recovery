@@ -8,9 +8,9 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from exp_d.config import ExperimentDConfig
+from exp_d.cluster_recovery import render_all
 from exp_d.experiment import run_experiment_d
-from exp_d.plotting import plot_experiment_d
-from exp_d.summary import summarize
+from exp_d.online_flows import OnlineFlowConfig, run_online_flows, run_online_variant_panel
 from scr.artifacts import copy_to_latex_images
 
 
@@ -25,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skip-plot",
         action="store_true",
-        help="Run training and summary only; do not write the PNG figure.",
+        help="Run training and summary only; do not write PNG figures.",
     )
     parser.add_argument(
         "--recompute",
@@ -41,26 +41,28 @@ def main() -> None:
     output_dir = config.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    cache_path = output_dir / "learned_clusters_results.pkl"
-    figure_path = output_dir / "learned_clusters.png"
+    cache_path = output_dir / "cluster_recovery_results.pkl"
 
     if cache_path.exists() and not args.recompute:
         with cache_path.open("rb") as f:
-            payload = pickle.load(f)
+            bundle = pickle.load(f)
         print(f"Used cache: {cache_path}")
     else:
-        payload = run_experiment_d(config)
+        online_config = OnlineFlowConfig(output_dir=output_dir)
+        bundle = {
+            "learned_clusters": run_experiment_d(config),
+            "online_flows": run_online_flows(online_config),
+            "online_variant_panel": run_online_variant_panel(online_config),
+        }
         with cache_path.open("wb") as f:
-            pickle.dump(payload, f)
+            pickle.dump(bundle, f)
         print(f"Saved cache: {cache_path}")
 
     if not args.skip_plot:
-        plot_experiment_d(payload, figure_path)
-        latex_figure_path = copy_to_latex_images(figure_path)
+        render_all(bundle, output_dir)
+        latex_figure_path = copy_to_latex_images(output_dir / "learned_clusters.png")
 
-    print(summarize(payload))
     if not args.skip_plot:
-        print(f"Saved figure: {figure_path}")
         print(f"Saved LaTeX figure: {latex_figure_path}")
 
 

@@ -156,25 +156,6 @@ def gmm_1d_soft(
     return responsibilities, info
 
 
-def hard_random_partition_responsibilities(
-    n_annotators: int, n_clusters: int, seed: int
-) -> np.ndarray:
-    """Random partition expressed as one-hot responsibilities."""
-    from exp_d.clustering import random_partition
-
-    labels = random_partition(n_annotators, n_clusters, seed)
-    responsibilities = np.zeros((n_annotators, n_clusters), dtype=np.float64)
-    responsibilities[np.arange(n_annotators), labels] = 1.0
-    return responsibilities
-
-
-def hard_oracle_responsibilities(annotator_cluster: np.ndarray, n_clusters: int) -> np.ndarray:
-    """Oracle ground-truth cluster expressed as one-hot responsibilities."""
-    responsibilities = np.zeros((annotator_cluster.shape[0], n_clusters), dtype=np.float64)
-    responsibilities[np.arange(annotator_cluster.shape[0]), annotator_cluster] = 1.0
-    return responsibilities
-
-
 def soft_normalized_mutual_information(
     responsibilities: np.ndarray, truth: np.ndarray
 ) -> float:
