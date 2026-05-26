@@ -62,9 +62,9 @@ Instead of a single hard cluster id, the annotator has fractional membership ove
 
 Cluster recovery is measured with NMI and purity. For hard labels, the contingency table is:
 
-$$
+\[
 C_{kz} = \left|\{a : c_a = k \ \mathrm{and}\ z_a = z\}\right|
-$$
+\]
 
 For soft labels, the corresponding soft contingency is:
 
