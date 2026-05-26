@@ -12,10 +12,8 @@ __pycache__/
 .ruff_cache/
 
 # Local scratch files
-cpo.zip
 dawid_skene.py
 notes.txt
-upool_analysis.md
 
 # Experiment outputs
 outputs/**/*.pkl
@@ -24,30 +22,11 @@ outputs/**/*.csv
 # Ad-hoc exported figures at the top level
 /*.png
 
-# LaTeX build artifacts
-*.aux
-*.fdb_latexmk
-*.fls
-*.log
-*.nav
-*.out
-*.snm
-*.synctex.gz
-*.toc
-*.vrb
-
-# LaTeX files
 latex/
 report/
-latex/*.tex
-latex/*.sty
-report/*.tex
 
 
 # Keep deck source images tracked even though top-level PNGs are ignored
 !latex/images/*.png
 
 notes/
-
-CPO alignment – 2026_05_14 14_00 GMT – Notes by Gemini.docx
-clustering_flows.md
