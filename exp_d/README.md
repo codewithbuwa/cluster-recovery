@@ -27,7 +27,7 @@ Hard offline clustering is included as a comparison point for the online variant
 Let annotator $a$ provide preference labels $d_i \in \{0, 1\}$, where $d_i = 1$ means the sampled response was labeled desirable. The 1-D annotator signature is the empirical desirable rate:
 
 $$
-s_a = \frac{\sum_{i:\operatorname{annotator}(i)=a} d_i}{n_a}
+s_a = \frac{\sum_{i:\mathrm{annotator}(i)=a} d_i}{n_a}
 $$
 
 For online streaming, the signature is updated from the prefix of labels observed so far:
@@ -62,9 +62,9 @@ Instead of a single hard cluster id, the annotator has fractional membership ove
 
 Cluster recovery is measured with NMI and purity. For hard labels, the contingency table is:
 
-\[
+$$
 C_{kz} = \left|\{a : c_a = k \ \mathrm{and}\ z_a = z\}\right|
-\]
+$$
 
 For soft labels, the corresponding soft contingency is:
 
@@ -75,7 +75,7 @@ $$
 Purity measures how much cluster mass lands on the best matching true group:
 
 $$
-\operatorname{purity} = \frac{1}{A}\sum_k \max_z C_{kz}
+\mathrm{purity} = \frac{1}{A}\sum_k \max_z C_{kz}
 $$
 
 NMI normalizes mutual information between predicted clusters and true latent annotator groups, so high NMI and high purity indicate that the learned signatures recover the ground-truth annotator structure.
