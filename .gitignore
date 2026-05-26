@@ -25,8 +25,4 @@ outputs/**/*.csv
 latex/
 report/
 
-
-# Keep deck source images tracked even though top-level PNGs are ignored
-!latex/images/*.png
-
 notes/
