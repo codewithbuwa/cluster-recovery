@@ -61,36 +61,49 @@ def _reward_grad_to_theta(
     return grad / normalizer
 
 
+def _kl_grad_to_theta(policy: np.ndarray) -> np.ndarray:
+    log_ratio = np.log(policy) + np.log(policy.shape[1])
+    kl_per_prompt = np.sum(policy * log_ratio, axis=1, keepdims=True)
+    return policy * (log_ratio - kl_per_prompt) / policy.shape[0]
+
+
 def _pair_loss_grad(
     theta: np.ndarray,
     x: np.ndarray,
-    y: np.ndarray,
-    desirable: np.ndarray,
-    cluster: np.ndarray,
+    y_winner: np.ndarray,
+    y_loser: np.ndarray,
     train_config: TrainConfig,
     n_responses: int,
 ) -> np.ndarray:
     policy = softmax(theta)
-    rewards = np.log(policy[x, y]) + np.log(n_responses)
-    dloss_dr = np.zeros(len(x), dtype=np.float64)
-    pair_count = 0
+    reward_winner = np.log(policy[x, y_winner]) + np.log(n_responses)
+    reward_loser = np.log(policy[x, y_loser]) + np.log(n_responses)
+    margin = reward_winner - reward_loser
+    coeff = -train_config.beta * (1.0 - _sigmoid(train_config.beta * margin))
 
-    for prompt_id in np.unique(x):
-        prompt_mask = x == prompt_id
-        for cluster_id in np.unique(cluster[prompt_mask]):
-            group_mask = prompt_mask & (cluster == cluster_id)
-            desirable_idx = np.flatnonzero(group_mask & (desirable == 1.0))
-            undesirable_idx = np.flatnonzero(group_mask & (desirable == 0.0))
-            for good_idx in desirable_idx:
-                deltas = rewards[good_idx] - rewards[undesirable_idx]
-                coeffs = -train_config.beta * (1.0 - _sigmoid(train_config.beta * deltas))
-                dloss_dr[good_idx] += coeffs.sum()
-                np.add.at(dloss_dr, undesirable_idx, -coeffs)
-                pair_count += len(undesirable_idx)
+    pair_x = np.concatenate([x, x])
+    pair_y = np.concatenate([y_winner, y_loser])
+    dloss_dr = np.concatenate([coeff, -coeff])
+    return _reward_grad_to_theta(policy, pair_x, pair_y, dloss_dr, len(x))
 
-    if pair_count == 0:
-        return np.zeros_like(theta)
-    return _reward_grad_to_theta(policy, x, y, dloss_dr, pair_count)
+
+def _batch_sizes(train_config: TrainConfig) -> tuple[int, int]:
+    if not 0.0 <= train_config.pair_fraction <= 1.0:
+        raise ValueError(f"pair_fraction must be in [0, 1], got {train_config.pair_fraction}")
+
+    if train_config.total_effort is None:
+        if train_config.pair_fraction == 0.0:
+            return train_config.batch_size, 0
+        total_effort = train_config.batch_size
+    else:
+        total_effort = train_config.total_effort
+
+    if total_effort < 0:
+        raise ValueError(f"total_effort must be non-negative, got {total_effort}")
+
+    n_unary = int((1.0 - train_config.pair_fraction) * total_effort)
+    n_pair = int(train_config.pair_fraction * total_effort / 2.0)
+    return n_unary, n_pair
 
 
 def _loss_grad(
@@ -102,25 +115,47 @@ def _loss_grad(
     z_i: np.ndarray,
     train_config: TrainConfig,
     n_responses: int,
+    pair_x: np.ndarray | None = None,
+    pair_winner: np.ndarray | None = None,
+    pair_loser: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     if not 0.0 <= train_config.alpha <= 1.0:
         raise ValueError(f"alpha must be in [0, 1], got {train_config.alpha}")
 
     policy = softmax(theta)
-    rewards = np.log(policy[x, y]) + np.log(n_responses)
-    sign = np.where(desirable == 1.0, 1.0, -1.0)
-    margin = np.where(desirable == 1.0, rewards - z_i, z_i - rewards)
-    sigmoid = _sigmoid(train_config.beta * margin)
-    grad_weight = sigmoid * (1.0 - sigmoid)
-    lambdas = np.where(desirable == 1.0, train_config.lambda_desirable, train_config.lambda_undesirable)
-    dloss_dr = lambdas * (-train_config.beta * grad_weight) * sign
+    unary_grad = np.zeros_like(theta)
+    grad_weight = np.empty(0, dtype=np.float64)
 
-    unary_grad = _reward_grad_to_theta(policy, x, y, dloss_dr, len(x))
-    if train_config.alpha == 0.0:
-        return unary_grad, grad_weight
+    if len(x) > 0 and train_config.alpha < 1.0:
+        rewards = np.log(policy[x, y]) + np.log(n_responses)
+        sign = np.where(desirable == 1.0, 1.0, -1.0)
+        margin = np.where(desirable == 1.0, rewards - z_i, z_i - rewards)
+        sigmoid = _sigmoid(train_config.beta * margin)
+        grad_weight = sigmoid * (1.0 - sigmoid)
+        lambdas = np.where(desirable == 1.0, train_config.lambda_desirable, train_config.lambda_undesirable)
+        dloss_dr = lambdas * (-train_config.beta * grad_weight) * sign
+        unary_grad = _reward_grad_to_theta(policy, x, y, dloss_dr, len(x))
 
-    pair_grad = _pair_loss_grad(theta, x, y, desirable, cluster, train_config, n_responses)
+    pair_grad = np.zeros_like(theta)
+    if (
+        pair_x is not None
+        and pair_winner is not None
+        and pair_loser is not None
+        and len(pair_x) > 0
+        and train_config.alpha > 0.0
+    ):
+        pair_grad = _pair_loss_grad(
+            theta,
+            pair_x,
+            pair_winner,
+            pair_loser,
+            train_config,
+            n_responses,
+        )
+
     grad = (1.0 - train_config.alpha) * unary_grad + train_config.alpha * pair_grad
+    if train_config.eta != 0.0:
+        grad += train_config.eta * _kl_grad_to_theta(policy)
     return grad, grad_weight
 
 
@@ -136,12 +171,14 @@ def train_method(
     cluster_mode: str = "true",
     log_prefix: str | None = None,
 ) -> TrainResult:
-    if method not in {"kto", "cpo"}:
+    if method not in {"kto", "cpo", "dpo"}:
         raise ValueError(f"unknown method: {method}")
-    if reference_variant not in {"undesirable", "all", "kl"}:
+    if reference_variant not in {"desirable", "undesirable", "all", "kl"}:
         raise ValueError(f"unknown reference variant: {reference_variant}")
     if cluster_mode not in {"true", "random"}:
         raise ValueError(f"unknown cluster mode: {cluster_mode}")
+    if method == "dpo" and train_config.alpha != 1.0:
+        raise ValueError("dpo requires TrainConfig(alpha=1.0)")
 
     cfg = world.config
     rng = np.random.default_rng(seed)
@@ -164,25 +201,63 @@ def train_method(
     random_cluster_rng = np.random.default_rng(seed + 89_999) if cluster_mode == "random" else None
 
     for step in range(train_config.steps):
-        x, y, desirable, true_cluster = world.sample_batch(
-            rng, train_config.batch_size, force_cluster=force_cluster
-        )
+        n_unary, n_pair = _batch_sizes(train_config)
+        if train_config.alpha == 0.0:
+            n_pair = 0
+        if train_config.alpha == 1.0:
+            n_unary = 0
+
+        if n_unary > 0:
+            x, y, desirable, true_cluster = world.sample_batch(
+                rng, n_unary, force_cluster=force_cluster
+            )
+        else:
+            x = np.empty(0, dtype=np.int64)
+            y = np.empty(0, dtype=np.int64)
+            desirable = np.empty(0, dtype=np.float64)
+            true_cluster = np.empty(0, dtype=np.int64)
+
         if method == "cpo" and cluster_mode == "random":
-            cpo_cluster = random_cluster_rng.integers(0, 2, size=train_config.batch_size)
+            cpo_cluster = random_cluster_rng.integers(0, 2, size=n_unary)
         else:
             cpo_cluster = true_cluster
         ref_cluster = cpo_cluster if method == "cpo" else np.zeros_like(true_cluster)
+
+        if n_pair > 0:
+            pair_x, pair_winner, pair_loser = world.sample_pair_batch(
+                rng,
+                n_pair,
+                pair_noise=train_config.pair_noise,
+            )
+        else:
+            pair_x = None
+            pair_winner = None
+            pair_loser = None
+
         policy = softmax(theta)
-        rewards = np.log(policy[x, y]) + np.log(cfg.n_responses)
+        rewards = np.log(policy[x, y]) + np.log(cfg.n_responses) if n_unary > 0 else np.empty(0)
         z_i = ref.get(ref_cluster)
         if record_references:
             reference_logs.append(ref.z.copy())
-        grad, grad_weight = _loss_grad(theta, x, y, desirable, ref_cluster, z_i, train_config, cfg.n_responses)
+        grad, grad_weight = _loss_grad(
+            theta,
+            x,
+            y,
+            desirable,
+            ref_cluster,
+            z_i,
+            train_config,
+            cfg.n_responses,
+            pair_x=pair_x,
+            pair_winner=pair_winner,
+            pair_loser=pair_loser,
+        )
 
         adam_m, adam_v = _adam_update(
             theta, grad, adam_m, adam_v, step + 1, train_config.learning_rate
         )
-        ref.update(rewards, x, ref_cluster, desirable, policy)
+        if n_unary > 0:
+            ref.update(rewards, x, ref_cluster, desirable, policy)
 
         if record_grad_weights:
             means = []

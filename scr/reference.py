@@ -16,7 +16,7 @@ class ReferencePoint:
         pooled: bool = False,
         variant: str = "undesirable",
     ):
-        if variant not in {"undesirable", "all", "kl"}:
+        if variant not in {"desirable","undesirable", "all", "kl"}:
             raise ValueError(f"unknown reference variant: {variant}")
         self.world_config = world_config
         self.train_config = train_config
@@ -44,6 +44,10 @@ class ReferencePoint:
             elif self.variant == "all":
                 if np.any(cluster_mask):
                     self._update_one(ref_idx, float(rewards[cluster_mask].mean()))
+            elif self.variant == "desirable":
+                mask = cluster_mask & (desirable == 1.0)
+                if np.any(mask):
+                    self._update_one(ref_idx, float(rewards[mask].mean()))
             else:
                 mask = cluster_mask & (desirable == 0.0)
                 if np.any(mask):

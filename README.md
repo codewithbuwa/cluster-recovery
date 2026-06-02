@@ -2,12 +2,19 @@
 
 This repository contains the code and figures for the cluster-referenced preference optimization experiments from `CPO_new.pdf`.
 
+The shared training code also supports the mixed unary + pairwise regime described in
+`documentation/CPO_part2.pdf`. That extension reuses the unary CPO/KTO flow and adds a
+true DPO-style pairwise stream with label-equivalent budget accounting.
+
 The shared implementation lives in `scr/`, and the experiment-specific code lives in:
 
 - `exp_a/` - main CPO vs KTO mechanism diagnostic
 - `exp_b/` - `pi_A` sweep
 - `exp_c/` - ablations
 - `exp_d/` - cluster recovery and streaming clustering diagnostics
+
+The mixed-regime experiment wrappers have not been added yet; the reusable mechanics live in
+`scr/`.
 
 ## Setup
 
@@ -40,6 +47,39 @@ For render-only helpers, use:
 .venv/bin/python3 -m exp_d.cluster_recovery
 ```
 
+## Mixed Unary + Pairwise Training
+
+The mixed-regime support is controlled through `scr.config.TrainConfig` and
+`scr.training.train_method`.
+
+Relevant configuration fields:
+
+- `alpha` - loss mixing weight. `0.0` is unary-only; `1.0` is pairwise-only DPO.
+- `pair_fraction` - fraction of label-equivalent effort spent on pairwise samples.
+- `total_effort` - total label-equivalent budget per training step. If unset, the existing
+  `batch_size` behavior is preserved for unary-only experiments.
+- `pair_noise` - probability of flipping a pairwise winner/loser label.
+
+Pairwise labels are sampled by `SyntheticWorld.sample_pair_batch`, which returns
+`(x, y_winner, y_loser)` from the latent quality table. Unary labels remain the only source used
+to update the CPO/KTO reference points `z` or `z_k`.
+
+Example modes:
+
+```python
+from scr.config import TrainConfig
+
+# KTO or CPO, unary-only. This preserves the original A-D behavior.
+unary_only = TrainConfig(alpha=0.0, pair_fraction=0.0)
+
+# Mixed CPO with 256 label-equivalent samples per step:
+# 128 unary labels and 64 pairwise labels.
+mixed_cpo = TrainConfig(alpha=0.5, pair_fraction=0.5, total_effort=256)
+
+# Pure DPO with all effort spent on pairwise labels.
+dpo = TrainConfig(alpha=1.0, pair_fraction=1.0, total_effort=256)
+```
+
 ## Outputs
 
 The default outputs are:
@@ -66,4 +106,3 @@ Each experiment has its own README with the setup, outputs, and implementation r
 - [Experiment B](exp_b/README.md)
 - [Experiment C](exp_c/README.md)
 - [Experiment D](exp_d/README.md)
-

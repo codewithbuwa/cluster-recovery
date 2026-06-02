@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C3 Value Function Drawer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f2;
+      --ink: #18201f;
+      --muted: #5f6965;
+      --line: #d7dbd2;
+      --panel: #ffffff;
+      --blue: #2867b2;
+      --orange: #d2691e;
+      --green: #20805f;
+      --red: #b33d3d;
+      --violet: #7353ba;
+      --shadow: 0 18px 50px rgba(24, 32, 31, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 34px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.55rem, 3vw, 2.6rem);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.55;
+    }
+
+    .formula {
+      justify-self: end;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.7);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.86rem;
+      white-space: nowrap;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .plot-shell,
+    .controls,
+    .readout {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .plot-shell {
+      overflow: hidden;
+    }
+
+    .plot-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .mode-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 8px;
+      min-height: 36px;
+      padding: 0 12px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button[aria-pressed="true"] {
+      border-color: #183f72;
+      background: #e8f0fb;
+      color: #183f72;
+      font-weight: 700;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: min(62vh, 610px);
+      min-height: 420px;
+      touch-action: none;
+      background: linear-gradient(#ffffff, #fbfbf7);
+    }
+
+    .side {
+      display: grid;
+      gap: 12px;
+    }
+
+    .controls,
+    .readout {
+      padding: 16px;
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 800;
+    }
+
+    .control {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 16px;
+    }
+
+    label,
+    .label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.94rem;
+      font-weight: 700;
+    }
+
+    output,
+    .metric-value {
+      color: var(--ink);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--blue);
+    }
+
+    .beta-presets {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .beta-presets button {
+      padding: 0 4px;
+      font-size: 0.84rem;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 12px 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.35;
+    }
+
+    .check-row input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--green);
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .swatch {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch::before {
+      content: "";
+      width: 20px;
+      height: 3px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+
+    .metrics {
+      display: grid;
+      gap: 10px;
+    }
+
+    .metric {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .metric:last-child {
+      border-bottom: 0;
+    }
+
+    .metric-name {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
+    .note {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 920px) {
+      header,
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .formula {
+        justify-self: start;
+        white-space: normal;
+      }
+
+      canvas {
+        min-height: 360px;
+        height: 54vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>C3 Value Function Drawer</h1>
+        <p class="subtitle">
+          Move beta or drag the vertical margin marker. Larger beta makes the sigmoid value function transition faster around zero margin, concentrating the gradient into a narrower decision band.
+        </p>
+      </div>
+      <div class="formula">m = sign * (r - z), V_beta(m) = sigmoid(beta * m)</div>
+    </header>
+
+    <section class="workspace" aria-label="Interactive value function drawer">
+      <div class="plot-shell">
+        <div class="plot-topbar">
+          <div class="mode-tabs" role="group" aria-label="Curve mode">
+            <button type="button" data-mode="value" aria-pressed="true">Value</button>
+            <button type="button" data-mode="loss" aria-pressed="false">Loss</button>
+            <button type="button" data-mode="grad" aria-pressed="false">Gradient</button>
+          </div>
+          <div class="legend" aria-label="Plot legend">
+            <span class="swatch" style="color: var(--blue)">selected beta</span>
+            <span class="swatch" style="color: var(--orange)">C3 sweep</span>
+            <span class="swatch" style="color: var(--green)">current margin</span>
+          </div>
+        </div>
+        <canvas id="plot" width="1100" height="660" aria-label="Interactive plot of beta-scaled value function"></canvas>
+      </div>
+
+      <aside class="side">
+        <div class="controls">
+          <p class="section-title">Controls</p>
+
+          <div class="control">
+            <label for="beta">Beta <output id="betaOut">1.00</output></label>
+            <input id="beta" type="range" min="0.1" max="20" step="0.1" value="1">
+          </div>
+
+          <div class="beta-presets" aria-label="Experiment C3 beta presets">
+            <button type="button" data-beta="0.3">0.3</button>
+            <button type="button" data-beta="1">1.0</button>
+            <button type="button" data-beta="3">3.0</button>
+            <button type="button" data-beta="10">10.0</button>
+          </div>
+
+          <div class="control">
+            <label for="margin">Margin <output id="marginOut">0.50</output></label>
+            <input id="margin" type="range" min="-4" max="4" step="0.01" value="0.5">
+          </div>
+
+          <div class="control">
+            <label for="reference">Reference z <output id="referenceOut">0.00</output></label>
+            <input id="reference" type="range" min="-3" max="3" step="0.05" value="0">
+          </div>
+
+          <div class="control">
+            <label for="reward">Reward r <output id="rewardOut">0.50</output></label>
+            <input id="reward" type="range" min="-3" max="3" step="0.05" value="0.5">
+          </div>
+
+          <label class="check-row">
+            <input id="desirable" type="checkbox" checked>
+            Desirable sample: margin is r - z
+          </label>
+
+          <label class="check-row">
+            <input id="compare" type="checkbox" checked>
+            Overlay C3 beta sweep values
+          </label>
+        </div>
+
+        <div class="readout">
+          <p class="section-title">Readout</p>
+          <div class="metrics">
+            <div class="metric">
+              <span class="metric-name">V_beta(m)</span>
+              <span class="metric-value" id="valueMetric">0.6225</span>
+            </div>
+            <div class="metric">
+              <span class="metric-name">softplus loss log(1 + exp(-beta m))</span>
+              <span class="metric-value" id="lossMetric">0.4741</span>
+            </div>
+            <div class="metric">
+              <span class="metric-name">gradient weight V(1 - V)</span>
+              <span class="metric-value" id="gradMetric">0.2350</span>
+            </div>
+            <div class="metric">
+              <span class="metric-name">training slope beta * V(1 - V)</span>
+              <span class="metric-value" id="slopeMetric">0.2350</span>
+            </div>
+          </div>
+          <p class="note">
+            In C3, beta does not move the zero-margin threshold. At exactly zero margin, the value, loss, and gradient weight stay fixed; away from zero, beta controls how abruptly samples switch from uncertain to saturated.
+          </p>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("plot");
+    const ctx = canvas.getContext("2d");
+    const state = {
+      beta: 1,
+      margin: 0.5,
+      reference: 0,
+      reward: 0.5,
+      desirable: true,
+      compare: true,
+      mode: "value",
+      dragging: false,
+    };
+
+    const betaSlider = document.getElementById("beta");
+    const marginSlider = document.getElementById("margin");
+    const referenceSlider = document.getElementById("reference");
+    const rewardSlider = document.getElementById("reward");
+    const desirableInput = document.getElementById("desirable");
+    const compareInput = document.getElementById("compare");
+    const betaOut = document.getElementById("betaOut");
+    const marginOut = document.getElementById("marginOut");
+    const referenceOut = document.getElementById("referenceOut");
+    const rewardOut = document.getElementById("rewardOut");
+    const valueMetric = document.getElementById("valueMetric");
+    const lossMetric = document.getElementById("lossMetric");
+    const gradMetric = document.getElementById("gradMetric");
+    const slopeMetric = document.getElementById("slopeMetric");
+    const modes = Array.from(document.querySelectorAll("[data-mode]"));
+    const betaPresets = Array.from(document.querySelectorAll("[data-beta]"));
+    const c3Betas = [0.3, 1, 3, 10];
+    const colors = {
+      selected: "#2867b2",
+      sweep: "#d2691e",
+      marker: "#20805f",
+      grid: "#e4e7df",
+      axis: "#26302d",
+      loss: "#7353ba",
+      grad: "#b33d3d",
+    };
+
+    function sigmoid(x) {
+      if (x >= 0) return 1 / (1 + Math.exp(-x));
+      const e = Math.exp(x);
+      return e / (1 + e);
+    }
+
+    function softplusLoss(beta, margin) {
+      const x = -beta * margin;
+      if (x > 40) return x;
+      return Math.log1p(Math.exp(x));
+    }
+
+    function curveValue(beta, margin, mode) {
+      const v = sigmoid(beta * margin);
+      if (mode === "value") return v;
+      if (mode === "loss") return softplusLoss(beta, margin);
+      return v * (1 - v);
+    }
+
+    function yDomain(mode) {
+      if (mode === "loss") return { min: 0, max: 8 };
+      if (mode === "grad") return { min: 0, max: 0.26 };
+      return { min: 0, max: 1 };
+    }
+
+    function layout() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.round(rect.width * dpr);
+      const height = Math.round(rect.height * dpr);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return {
+        width: rect.width,
+        height: rect.height,
+        left: 62,
+        right: 22,
+        top: 28,
+        bottom: 54,
+        xMin: -4,
+        xMax: 4,
+        y: yDomain(state.mode),
+      };
+    }
+
+    function toX(margin, box) {
+      return box.left + ((margin - box.xMin) / (box.xMax - box.xMin)) * (box.width - box.left - box.right);
+    }
+
+    function fromX(x, box) {
+      const plotWidth = box.width - box.left - box.right;
+      return box.xMin + ((x - box.left) / plotWidth) * (box.xMax - box.xMin);
+    }
+
+    function toY(value, box) {
+      const plotHeight = box.height - box.top - box.bottom;
+      return box.top + (1 - ((value - box.y.min) / (box.y.max - box.y.min))) * plotHeight;
+    }
+
+    function drawAxes(box) {
+      ctx.clearRect(0, 0, box.width, box.height);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = colors.grid;
+      ctx.fillStyle = "#5f6965";
+      ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+
+      for (let x = -4; x <= 4; x += 1) {
+        const px = toX(x, box);
+        ctx.beginPath();
+        ctx.moveTo(px, box.top);
+        ctx.lineTo(px, box.height - box.bottom);
+        ctx.stroke();
+        ctx.fillText(String(x), px, box.height - box.bottom + 12);
+      }
+
+      const yTicks = state.mode === "loss" ? [0, 2, 4, 6, 8] : state.mode === "grad" ? [0, 0.125, 0.25] : [0, 0.25, 0.5, 0.75, 1];
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      yTicks.forEach((tick) => {
+        const py = toY(tick, box);
+        ctx.beginPath();
+        ctx.moveTo(box.left, py);
+        ctx.lineTo(box.width - box.right, py);
+        ctx.stroke();
+        ctx.fillText(tick.toFixed(tick % 1 === 0 ? 0 : 3).replace(/0+$/, "").replace(/\.$/, ""), box.left - 10, py);
+      });
+
+      ctx.strokeStyle = colors.axis;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(box.left, box.height - box.bottom);
+      ctx.lineTo(box.width - box.right, box.height - box.bottom);
+      ctx.moveTo(box.left, box.top);
+      ctx.lineTo(box.left, box.height - box.bottom);
+      ctx.stroke();
+
+      const zeroX = toX(0, box);
+      ctx.strokeStyle = "#a9b0aa";
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(zeroX, box.top);
+      ctx.lineTo(zeroX, box.height - box.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "#18201f";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      ctx.font = "700 13px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillText("margin m", box.left + (box.width - box.left - box.right) / 2, box.height - 10);
+
+      ctx.save();
+      ctx.translate(18, box.top + (box.height - box.top - box.bottom) / 2);
+      ctx.rotate(-Math.PI / 2);
+      const label = state.mode === "value" ? "V_beta(m)" : state.mode === "loss" ? "loss" : "gradient weight";
+      ctx.fillText(label, 0, 0);
+      ctx.restore();
+    }
+
+    function drawCurve(beta, box, stroke, width, alpha, dash = []) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = width;
+      ctx.setLineDash(dash);
+      ctx.beginPath();
+      const steps = 420;
+      for (let i = 0; i <= steps; i += 1) {
+        const margin = box.xMin + (i / steps) * (box.xMax - box.xMin);
+        const y = curveValue(beta, margin, state.mode);
+        const px = toX(margin, box);
+        const py = toY(Math.min(Math.max(y, box.y.min), box.y.max), box);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawMarker(box) {
+      const px = toX(state.margin, box);
+      const curve = curveValue(state.beta, state.margin, state.mode);
+      const py = toY(Math.min(Math.max(curve, box.y.min), box.y.max), box);
+      ctx.strokeStyle = colors.marker;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath();
+      ctx.moveTo(px, box.top);
+      ctx.lineTo(px, box.height - box.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = colors.marker;
+      ctx.beginPath();
+      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+
+      const calloutWidth = 154;
+      const calloutHeight = 46;
+      const calloutX = Math.min(Math.max(px + 12, box.left + 8), box.width - box.right - calloutWidth);
+      const calloutY = Math.max(box.top + 8, py - 58);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.94)";
+      ctx.strokeStyle = "#cfd5ce";
+      ctx.lineWidth = 1;
+      roundedRect(calloutX, calloutY, calloutWidth, calloutHeight, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#18201f";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.font = "700 12px ui-monospace, SFMono-Regular, Menlo, monospace";
+      ctx.fillText(`m=${state.margin.toFixed(2)}`, calloutX + 10, calloutY + 8);
+      ctx.fillText(`beta=${state.beta.toFixed(1)}`, calloutX + 10, calloutY + 25);
+    }
+
+    function roundedRect(x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function drawLabels(box) {
+      ctx.font = "700 12px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      if (!state.compare) return;
+      c3Betas.forEach((beta, index) => {
+        const y = curveValue(beta, 3.6, state.mode);
+        const px = toX(3.62, box);
+        const py = toY(Math.min(Math.max(y, box.y.min), box.y.max), box) + (index - 1.5) * 2;
+        ctx.fillStyle = beta === state.beta ? colors.selected : colors.sweep;
+        ctx.fillText(`beta ${beta}`, px, Math.min(Math.max(py, box.top + 12), box.height - box.bottom - 12));
+      });
+    }
+
+    function draw() {
+      const box = layout();
+      drawAxes(box);
+      if (state.compare) {
+        c3Betas.forEach((beta) => {
+          drawCurve(beta, box, colors.sweep, beta === state.beta ? 2.4 : 1.3, beta === state.beta ? 0.95 : 0.45, beta === state.beta ? [] : [5, 6]);
+        });
+      }
+      const selectedColor = state.mode === "loss" ? colors.loss : state.mode === "grad" ? colors.grad : colors.selected;
+      drawCurve(state.beta, box, selectedColor, 4, 1);
+      drawMarker(box);
+      drawLabels(box);
+    }
+
+    function syncFromRewardReference() {
+      const sign = state.desirable ? 1 : -1;
+      state.margin = sign * (state.reward - state.reference);
+      state.margin = Math.max(-4, Math.min(4, state.margin));
+      marginSlider.value = String(state.margin);
+    }
+
+    function syncRewardFromMargin() {
+      const sign = state.desirable ? 1 : -1;
+      state.reward = state.reference + sign * state.margin;
+      state.reward = Math.max(-3, Math.min(3, state.reward));
+      rewardSlider.value = String(state.reward);
+    }
+
+    function update() {
+      betaOut.value = state.beta.toFixed(2);
+      marginOut.value = state.margin.toFixed(2);
+      referenceOut.value = state.reference.toFixed(2);
+      rewardOut.value = state.reward.toFixed(2);
+      const value = sigmoid(state.beta * state.margin);
+      const loss = softplusLoss(state.beta, state.margin);
+      const grad = value * (1 - value);
+      valueMetric.textContent = value.toFixed(4);
+      lossMetric.textContent = loss.toFixed(4);
+      gradMetric.textContent = grad.toFixed(4);
+      slopeMetric.textContent = (state.beta * grad).toFixed(4);
+      betaPresets.forEach((button) => {
+        button.setAttribute("aria-pressed", Number(button.dataset.beta) === state.beta ? "true" : "false");
+      });
+      draw();
+    }
+
+    betaSlider.addEventListener("input", (event) => {
+      state.beta = Number(event.target.value);
+      update();
+    });
+
+    marginSlider.addEventListener("input", (event) => {
+      state.margin = Number(event.target.value);
+      syncRewardFromMargin();
+      update();
+    });
+
+    referenceSlider.addEventListener("input", (event) => {
+      state.reference = Number(event.target.value);
+      syncFromRewardReference();
+      update();
+    });
+
+    rewardSlider.addEventListener("input", (event) => {
+      state.reward = Number(event.target.value);
+      syncFromRewardReference();
+      update();
+    });
+
+    desirableInput.addEventListener("change", (event) => {
+      state.desirable = event.target.checked;
+      syncFromRewardReference();
+      update();
+    });
+
+    compareInput.addEventListener("change", (event) => {
+      state.compare = event.target.checked;
+      update();
+    });
+
+    betaPresets.forEach((button) => {
+      button.addEventListener("click", () => {
+        state.beta = Number(button.dataset.beta);
+        betaSlider.value = String(state.beta);
+        update();
+      });
+    });
+
+    modes.forEach((button) => {
+      button.addEventListener("click", () => {
+        state.mode = button.dataset.mode;
+        modes.forEach((modeButton) => modeButton.setAttribute("aria-pressed", String(modeButton === button)));
+        draw();
+      });
+    });
+
+    function setMarginFromEvent(event) {
+      const rect = canvas.getBoundingClientRect();
+      const box = layout();
+      const x = event.clientX - rect.left;
+      state.margin = Math.max(box.xMin, Math.min(box.xMax, fromX(x, box)));
+      marginSlider.value = String(state.margin);
+      syncRewardFromMargin();
+      update();
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      state.dragging = true;
+      canvas.setPointerCapture(event.pointerId);
+      setMarginFromEvent(event);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (state.dragging) setMarginFromEvent(event);
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+      state.dragging = false;
+      canvas.releasePointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointercancel", () => {
+      state.dragging = false;
+    });
+
+    window.addEventListener("resize", draw);
+    update();
+  </script>
+</body>
+</html>

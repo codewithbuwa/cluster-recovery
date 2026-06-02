@@ -9,6 +9,8 @@ The four ablations are:
 - `C3 beta sweep`: varies $\beta \in \{0.3, 1.0, 3.0, 10.0\}$ to test sensitivity to the sigmoid sharpness in the loss.
 - `C4 misspecified clusters`: replaces true CPO clusters with random clusters; CPO should collapse back toward KTO.
 
+An interactive C3 value-function drawer is available in [`value_function_drawer/`](value_function_drawer/). Open its `index.html` directly in a browser to see how increasing $\beta$ sharpens the curve around zero margin.
+
 The main reported quantity is the final quality gap:
 
 $$

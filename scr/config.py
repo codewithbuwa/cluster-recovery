@@ -21,7 +21,11 @@ class TrainConfig:
     batch_size: int = 128
     learning_rate: float = 0.15
     beta: float = 1.0
+    eta: float = 0.0
     alpha: float = 0.0
+    pair_fraction: float = 0.0
+    total_effort: int | None = None
+    pair_noise: float = 0.05
     lambda_desirable: float = 1.0
     lambda_undesirable: float = 1.0
     ema_rate: float = 0.1

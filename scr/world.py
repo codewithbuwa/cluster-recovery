@@ -21,7 +21,7 @@ class SyntheticWorld:
         eps = np.where(cluster == 0, cfg.eps_a, cfg.eps_b)
         clean = self.q[x, y] > tau
         flips = rng.binomial(1, eps).astype(np.int8)
-        return np.logical_xor(clean.astype(np.int8), flips).astype(np.float64)
+        return np.logical_xor(clean.astype(np.int8), flips).astype(np.int8)
 
     def sample_batch(
         self,
@@ -47,3 +47,24 @@ class SyntheticWorld:
 
         desirable = self.label(x, y, c, rng)
         return x, y, desirable, c
+
+    def sample_pair_batch(
+        self,
+        rng: np.random.Generator,
+        batch_size: int,
+        pair_noise: float = 0.05,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        cfg = self.config
+        x = rng.integers(0, cfg.n_prompts, size=batch_size)
+        y_a = rng.integers(0, cfg.n_responses, size=batch_size)
+        y_b = rng.integers(0, cfg.n_responses - 1, size=batch_size)
+        y_b = np.where(y_b >= y_a, y_b + 1, y_b)
+
+        a_wins = self.q[x, y_a] >= self.q[x, y_b]
+        y_winner = np.where(a_wins, y_a, y_b)
+        y_loser = np.where(a_wins, y_b, y_a)
+
+        flips = rng.binomial(1, pair_noise, size=batch_size).astype(bool)
+        noisy_winner = np.where(flips, y_loser, y_winner)
+        noisy_loser = np.where(flips, y_winner, y_loser)
+        return x, noisy_winner, noisy_loser
