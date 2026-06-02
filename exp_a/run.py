@@ -1,6 +1,7 @@
 import argparse
 import pickle
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 
@@ -19,8 +20,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=ExperimentAConfig.output_dir,
+        default=None,
         help="Directory for the PNG, pickle cache, and text summary.",
+    )
+    parser.add_argument(
+        "--alpha",
+        type=float,
+        nargs="?",
+        const=0.5,
+        default=None,
+        help="Enable the mixed unary/pairwise extension with this loss weight; bare --alpha uses 0.5.",
+    )
+    parser.add_argument(
+        "--pair-fraction",
+        type=float,
+        default=None,
+        help="Fraction of label-equivalent effort spent on pairwise labels when --alpha is set.",
+    )
+    parser.add_argument(
+        "--total-effort",
+        type=int,
+        default=None,
+        help="Total label-equivalent samples per step when --alpha is set.",
     )
     parser.add_argument(
         "--skip-plot",
@@ -32,7 +53,28 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    config = ExperimentAConfig(output_dir=args.output_dir)
+    base_config = ExperimentAConfig()
+    train_config = base_config.train
+    output_dir = args.output_dir
+    if args.alpha is not None:
+        if not 0.0 <= args.alpha <= 1.0:
+            raise ValueError(f"--alpha must be in [0, 1], got {args.alpha}")
+        pair_fraction = 0.5 if args.pair_fraction is None else args.pair_fraction
+        total_effort = args.total_effort or 2 * train_config.batch_size
+        train_config = replace(
+            train_config,
+            alpha=args.alpha,
+            pair_fraction=pair_fraction,
+            total_effort=total_effort,
+        )
+        if output_dir is None:
+            alpha_label = f"{args.alpha:g}".replace(".", "p")
+            output_dir = Path(f"outputs/exp_a_alpha_{alpha_label}/")
+
+    if output_dir is None:
+        output_dir = ExperimentAConfig.output_dir
+
+    config = ExperimentAConfig(train=train_config, output_dir=output_dir)
     output_dir = config.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 

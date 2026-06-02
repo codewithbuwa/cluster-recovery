@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 
 from exp_a.config import ExperimentAConfig
@@ -29,11 +31,12 @@ def run_experiment_a(config: ExperimentAConfig) -> dict[str, object]:
             record_grad_weights=True,
             log_prefix="ExpA",
         )
+        oracle_train = replace(config.train, alpha=0.0, pair_fraction=0.0, total_effort=None)
         oracle = train_method(
             world,
             method="kto",
             seed=50_000 + seed,
-            train_config=config.train,
+            train_config=oracle_train,
             force_cluster=1,
             log_prefix="ExpA oracle_bob_only",
         )
