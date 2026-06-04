@@ -85,13 +85,20 @@ def main() -> None:
         print(f"Saved summary: {summary_path}")
 
         if not args.skip_plot:
-            from exp_e.plotting import plot
+            from exp_e.plotting import plot, plot_budget_sweep_deltas
             from scr.artifacts import copy_to_latex_images
 
             plot(payload, figure_path)
             latex_figure_path = copy_to_latex_images(figure_path)
             print(f"Saved figure: {figure_path}")
             print(f"Saved LaTeX figure: {latex_figure_path}")
+
+            if name == "budget_sweep":
+                delta_figure_path = output_dir / "budget_sweep_deltas.png"
+                plot_budget_sweep_deltas(payload, delta_figure_path)
+                latex_delta_figure_path = copy_to_latex_images(delta_figure_path)
+                print(f"Saved delta figure: {delta_figure_path}")
+                print(f"Saved LaTeX delta figure: {latex_delta_figure_path}")
 
 
 if __name__ == "__main__":

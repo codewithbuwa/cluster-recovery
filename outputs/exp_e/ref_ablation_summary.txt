@@ -1,0 +1,11 @@
+Experiment E reference/mixing ablation
+
+global z, alpha=0:      0.6611 +/- 0.0977
+cluster z_k, alpha=0:   0.8361 +/- 0.0052
+global z, alpha=0.5:    0.9357 +/- 0.0214
+cluster z_k, alpha=0.5: 0.9383 +/- 0.0189
+
+Cluster gain, unary:  0.1751
+Cluster gain, mixed:  0.0026
+Mixing gain, global:  0.2746
+Mixing gain, cluster: 0.1022

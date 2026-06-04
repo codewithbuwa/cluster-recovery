@@ -1,0 +1,27 @@
+Experiment E pi_A sweep
+
+pi_A=0.50
+    kto: 0.8982 +/- 0.0136
+    cpo: 0.8932 +/- 0.0077, delta_vs_kto=-0.0050
+    mixed_cpo: 0.9373 +/- 0.0179, delta_vs_kto=0.0391
+    dpo: 0.8846 +/- 0.0223, delta_vs_kto=-0.0137
+pi_A=0.70
+    kto: 0.8156 +/- 0.0441
+    cpo: 0.8827 +/- 0.0146, delta_vs_kto=0.0672
+    mixed_cpo: 0.9376 +/- 0.0181, delta_vs_kto=0.1221
+    dpo: 0.8846 +/- 0.0223, delta_vs_kto=0.0690
+pi_A=0.85
+    kto: 0.7865 +/- 0.0000
+    cpo: 0.8412 +/- 0.0019, delta_vs_kto=0.0547
+    mixed_cpo: 0.9383 +/- 0.0189, delta_vs_kto=0.1518
+    dpo: 0.8846 +/- 0.0223, delta_vs_kto=0.0980
+pi_A=0.95
+    kto: 0.6893 +/- 0.0337
+    cpo: 0.8350 +/- 0.0351, delta_vs_kto=0.1458
+    mixed_cpo: 0.9383 +/- 0.0189, delta_vs_kto=0.2491
+    dpo: 0.8846 +/- 0.0223, delta_vs_kto=0.1953
+pi_A=0.99
+    kto: 0.6312 +/- 0.0545
+    cpo: 0.6533 +/- 0.0090, delta_vs_kto=0.0221
+    mixed_cpo: 0.9383 +/- 0.0189, delta_vs_kto=0.3072
+    dpo: 0.8846 +/- 0.0223, delta_vs_kto=0.2534

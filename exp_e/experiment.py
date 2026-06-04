@@ -2,7 +2,7 @@ from dataclasses import replace
 
 from exp_e.config import ExperimentEConfig
 from scr.config import TrainConfig, WorldConfig
-from scr.training import TrainResult, train_method
+from scr.training import TrainResult, train_method, valid_budget_sweep_cell
 from scr.world import SyntheticWorld
 
 
@@ -59,30 +59,24 @@ def run_budget_sweep(config: ExperimentEConfig) -> dict[str, object]:
         n_unary, n_pair = _budget_counts(config.effort, pair_fraction)
         results[pair_fraction] = {}
         for label, (method, alpha) in METHOD_SPECS.items():
-            if alpha == 0.0 and n_unary == 0:
-                results[pair_fraction][label] = None
-                continue
-            if alpha == 1.0 and n_pair == 0:
-                results[pair_fraction][label] = None
-                continue
-            if 0.0 < alpha < 1.0 and (n_unary == 0 or n_pair == 0):
+            train = _with_budget(config.train, alpha=alpha, n_unary=n_unary, n_pair=n_pair)
+            if not valid_budget_sweep_cell(method, train):
                 results[pair_fraction][label] = None
                 continue
 
-            train = _with_budget(config.train, alpha=alpha, n_unary=n_unary, n_pair=n_pair)
             results[pair_fraction][label] = _run_method(
                 config.world,
                 train,
                 method,
-                config.seeds,
-                log_prefix=f"ExpE budget f={pair_fraction:g} {label}",
+                config.budget_seeds,
+                log_prefix=f"BUDGET SWEEP f={pair_fraction:g}",
             )
 
     return {
         "name": "budget_sweep",
         "world_config": config.world,
         "train_config": config.train,
-        "seeds": config.seeds,
+        "seeds": config.budget_seeds,
         "effort": config.effort,
         "pair_fraction_values": config.pair_fraction_values,
         "results": results,
@@ -100,15 +94,15 @@ def run_alpha_sweep(config: ExperimentEConfig) -> dict[str, object]:
             config.world,
             train,
             method,
-            config.seeds,
-            log_prefix=f"ExpE alpha={alpha:g}",
+            config.alpha_seeds,
+            log_prefix=f"ALPHA SWEEP alpha={alpha:g}",
         )
 
     return {
         "name": "alpha_sweep",
         "world_config": config.world,
         "train_config": config.train,
-        "seeds": config.seeds,
+        "seeds": config.alpha_seeds,
         "alpha_values": config.alpha_values,
         "fixed_n_unary": config.fixed_n_unary,
         "fixed_n_pair": config.fixed_n_pair,
@@ -135,15 +129,15 @@ def run_pia_sweep(config: ExperimentEConfig) -> dict[str, object]:
                 world_config,
                 train,
                 method,
-                config.seeds,
-                log_prefix=f"ExpE pi_A={pi_a:g} {label}",
+                config.pia_seeds,
+                log_prefix=f"PI_A SWEEP pi_A={pi_a:g}",
             )
 
     return {
         "name": "pia_sweep",
         "base_world_config": config.world,
         "train_config": config.train,
-        "seeds": config.seeds,
+        "seeds": config.pia_seeds,
         "pi_a_values": config.pi_a_values,
         "effort": config.effort,
         "fixed_n_unary": config.fixed_n_unary,
@@ -166,14 +160,14 @@ def run_ref_ablation(config: ExperimentEConfig) -> dict[str, object]:
         ),
     }
     results = {
-        label: _run_method(config.world, train, method, config.seeds, log_prefix=f"ExpE ref {label}")
+        label: _run_method(config.world, train, method, config.reference_seeds, log_prefix=f"REF ABLATION")
         for label, (method, train) in cells.items()
     }
     return {
         "name": "ref_ablation",
         "world_config": config.world,
         "train_config": config.train,
-        "seeds": config.seeds,
+        "seeds": config.reference_seeds,
         "fixed_n_unary": config.fixed_n_unary,
         "fixed_n_pair": config.fixed_n_pair,
         "results": results,

@@ -106,6 +106,20 @@ def _batch_sizes(train_config: TrainConfig) -> tuple[int, int]:
     return n_unary, n_pair
 
 
+def valid_budget_sweep_cell(method: str, train_config: TrainConfig) -> bool:
+    """Protocol filter for CPO_part2 Experiment 1 budget-sweep cells."""
+    n_unary, n_pair = _batch_sizes(train_config)
+    alpha = train_config.alpha
+
+    if alpha == 0.0:
+        return n_unary > 0
+    if alpha == 1.0:
+        return n_pair > 0
+    if 0.0 < alpha < 1.0:
+        return n_unary > 0 and n_pair > 0
+    return False
+
+
 def _loss_grad(
     theta: np.ndarray,
     x: np.ndarray,

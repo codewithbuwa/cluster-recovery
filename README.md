@@ -12,9 +12,7 @@ The shared implementation lives in `scr/`, and the experiment-specific code live
 - `exp_b/` - `pi_A` sweep
 - `exp_c/` - ablations
 - `exp_d/` - cluster recovery and streaming clustering diagnostics
-
-The mixed-regime experiment wrappers have not been added yet; the reusable mechanics live in
-`scr/`.
+- `exp_e/` - mixed unary + pairwise follow-up experiments
 
 ## Setup
 
@@ -34,6 +32,7 @@ Run the experiments from the repository root:
 .venv/bin/python3 -m exp_b.run
 .venv/bin/python3 -m exp_c.run
 .venv/bin/python3 -m exp_d.run
+.venv/bin/python3 -m exp_e.run
 ```
 
 Each experiment saves a pickle cache and a PNG figure under `outputs/`.
@@ -64,10 +63,16 @@ Pairwise labels are sampled by `SyntheticWorld.sample_pair_batch`, which returns
 `(x, y_winner, y_loser)` from the latent quality table. Unary labels remain the only source used
 to update the CPO/KTO reference points `z` or `z_k`.
 
+For the `CPO_part2.pdf` Experiment 1 budget sweep, use
+`scr.training.valid_budget_sweep_cell` to skip method-budget combinations whose required data
+stream is empty. With `f in {0, 0.125, 0.25, 0.5, 0.75, 1.0}`, four methods, and two seeds, this
+leaves nineteen valid method-budget cells, or thirty-eight runs total.
+
 Example modes:
 
 ```python
 from scr.config import TrainConfig
+from scr.training import valid_budget_sweep_cell
 
 # KTO or CPO, unary-only. This preserves the original A-D behavior.
 unary_only = TrainConfig(alpha=0.0, pair_fraction=0.0)
@@ -78,6 +83,8 @@ mixed_cpo = TrainConfig(alpha=0.5, pair_fraction=0.5, total_effort=256)
 
 # Pure DPO with all effort spent on pairwise labels.
 dpo = TrainConfig(alpha=1.0, pair_fraction=1.0, total_effort=256)
+
+assert valid_budget_sweep_cell("cpo", mixed_cpo)
 ```
 
 ## Outputs
@@ -97,6 +104,15 @@ The default outputs are:
 - `outputs/exp_d/panel_b_hard_offline.png`
 - `outputs/exp_d/panel_b_soft_online.png`
 - `outputs/exp_d/panel_b_all_k_sweep.png`
+- `outputs/exp_e/budget_sweep_results.pkl`
+- `outputs/exp_e/budget_sweep.png`
+- `outputs/exp_e/budget_sweep_deltas.png`
+- `outputs/exp_e/alpha_sweep_results.pkl`
+- `outputs/exp_e/alpha_sweep.png`
+- `outputs/exp_e/pia_sweep_results.pkl`
+- `outputs/exp_e/pia_sweep.png`
+- `outputs/exp_e/ref_ablation_results.pkl`
+- `outputs/exp_e/ref_ablation.png`
 
 ## Experiment Notes
 
@@ -106,3 +122,4 @@ Each experiment has its own README with the setup, outputs, and implementation r
 - [Experiment B](exp_b/README.md)
 - [Experiment C](exp_c/README.md)
 - [Experiment D](exp_d/README.md)
+- [Experiment E](exp_e/README.md)

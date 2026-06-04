@@ -14,6 +14,7 @@ __pycache__/
 # Local scratch files
 dawid_skene.py
 notes.txt
+*.zip
 
 # Experiment outputs
 outputs/**/*.pkl
