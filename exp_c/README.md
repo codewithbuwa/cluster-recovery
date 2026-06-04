@@ -22,7 +22,7 @@ $$
 Run from the workspace root:
 
 ```bash
-.venv/bin/python3 -m exp_c.run
+python3 exp_c/run.py
 ```
 
 Outputs:
@@ -35,7 +35,7 @@ outputs/exp_c/ablations.png
 Use `--skip-plot` to save the pickle without writing the PNG:
 
 ```bash
-.venv/bin/python3 -m exp_c.run --skip-plot
+python3 exp_c/run.py --skip-plot
 ```
 
 ## Render from the pickle

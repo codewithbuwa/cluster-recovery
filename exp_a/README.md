@@ -19,7 +19,7 @@ The diagnostic plot shows final quality and gradient-weight traces by cluster. T
 Run from the workspace root:
 
 ```bash
-.venv/bin/python3 -m exp_a.run
+python3 exp_a/run.py
 ```
 
 Outputs:
@@ -32,7 +32,7 @@ outputs/exp_a/grad_weight_diagnostic.png
 Use `--skip-plot` to save the pickle without writing the PNG:
 
 ```bash
-.venv/bin/python3 -m exp_a.run --skip-plot
+python3 exp_a/run.py --skip-plot
 ```
 
 ## Render from the pickle

@@ -26,7 +26,7 @@ seeds = 0..49
 Run from the workspace root:
 
 ```bash
-.venv/bin/python3 -m exp_b.run
+python3 exp_b/run.py
 ```
 
 Outputs:
@@ -39,7 +39,7 @@ outputs/exp_b/pi_sweep.png
 Use `--skip-plot` to save the pickle without writing the PNG:
 
 ```bash
-.venv/bin/python3 -m exp_b.run --skip-plot
+python3 exp_b/run.py --skip-plot
 ```
 
 ## Render from the pickle

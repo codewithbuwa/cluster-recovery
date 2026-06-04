@@ -28,9 +28,9 @@ def parse_args() -> argparse.Namespace:
         help="Run training and summary only; do not write PNG figures.",
     )
     parser.add_argument(
-        "--recompute",
+        "--use-cache",
         action="store_true",
-        help="Re-run the experiment even if a cache already exists.",
+        help="Reuse an existing bundled pickle instead of recomputing the experiment.",
     )
     return parser.parse_args()
 
@@ -43,10 +43,14 @@ def main() -> None:
 
     cache_path = output_dir / "cluster_recovery_results.pkl"
 
-    if cache_path.exists() and not args.recompute:
+    if args.use_cache and cache_path.exists():
         with cache_path.open("rb") as f:
             bundle = pickle.load(f)
         print(f"Used cache: {cache_path}")
+    elif args.use_cache:
+        raise FileNotFoundError(
+            f"cache does not exist: {cache_path}. Run without --use-cache first to compute it."
+        )
     else:
         online_config = OnlineFlowConfig(output_dir=output_dir)
         bundle = {
@@ -59,11 +63,12 @@ def main() -> None:
         print(f"Saved cache: {cache_path}")
 
     if not args.skip_plot:
-        render_all(bundle, output_dir)
-        latex_figure_path = copy_to_latex_images(output_dir / "learned_clusters.png")
+        figure_paths = render_all(bundle, output_dir)
+        latex_figure_paths = [copy_to_latex_images(path) for path in figure_paths]
 
     if not args.skip_plot:
-        print(f"Saved LaTeX figure: {latex_figure_path}")
+        for latex_figure_path in latex_figure_paths:
+            print(f"Saved LaTeX figure: {latex_figure_path}")
 
 
 if __name__ == "__main__":

@@ -28,14 +28,14 @@ python3 -m venv .venv
 Run the experiments from the repository root:
 
 ```bash
-.venv/bin/python3 -m exp_a.run
-.venv/bin/python3 -m exp_b.run
-.venv/bin/python3 -m exp_c.run
-.venv/bin/python3 -m exp_d.run
-.venv/bin/python3 -m exp_e.run
+python3 exp_a/run.py
+python3 exp_b/run.py
+python3 exp_c/run.py
+python3 exp_d/run.py
+python3 exp_e/run.py
 ```
 
-Each experiment saves a pickle cache and a PNG figure under `outputs/`.
+Each run recomputes the experiment and saves a pickle cache plus PNG figures under `outputs/`.
 
 For render-only helpers, use:
 

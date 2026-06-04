@@ -45,7 +45,7 @@ def load_bundle(path: Path) -> dict[str, object]:
     return payload
 
 
-def render_all(payload: dict[str, object], output_dir: Path) -> None:
+def render_all(payload: dict[str, object], output_dir: Path) -> list[Path]:
     learned_payload = payload["learned_clusters"]
     online_flows_payload = payload["online_flows"]
     online_variant_payload = payload["online_variant_panel"]
@@ -80,6 +80,7 @@ def render_all(payload: dict[str, object], output_dir: Path) -> None:
         figure_paths["all_ksweep"],
     )
     print(f"Saved figure: {figure_paths['all_ksweep']}")
+    return list(figure_paths.values())
 
 
 def main() -> None:

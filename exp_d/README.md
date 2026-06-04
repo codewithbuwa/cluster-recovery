@@ -94,10 +94,10 @@ Implementation references:
 Run from the workspace root to build the single bundled cache and render every Experiment D figure:
 
 ```bash
-.venv/bin/python3 -m exp_d.run
+python3 exp_d/run.py
 ```
 
-The bundled pickle is the only Exp D cache needed for the figures. It contains the learned-cluster experiment, the online hard/soft flow, and the online/offline variant panel payloads.
+This recomputes the learned-cluster experiment, the online hard/soft flow, and the online/offline variant panel payloads before rendering every figure. The bundled pickle is still written as the only Exp D cache needed for render-only regeneration.
 
 Outputs:
 
@@ -120,16 +120,16 @@ Figure meanings:
 - `panel_b_soft_online.png`: replaces learned clustering with soft online clustering.
 - `panel_b_all_k_sweep.png`: compares random, learned, hard-online, hard-offline, and soft-online clustering across K.
 
-Use `--skip-plot` to save or reuse the bundled pickle without writing PNGs:
+Use `--skip-plot` to recompute and save the bundled pickle without writing PNGs:
 
 ```bash
-.venv/bin/python3 -m exp_d.run --skip-plot
+python3 exp_d/run.py --skip-plot
 ```
 
-Use `--recompute` to ignore an existing bundle and rerun the experiment:
+Use `--use-cache` only when you explicitly want to reuse an existing bundle instead of recomputing:
 
 ```bash
-.venv/bin/python3 -m exp_d.run --recompute
+python3 exp_d/run.py --use-cache
 ```
 
 ## Render from the bundle
