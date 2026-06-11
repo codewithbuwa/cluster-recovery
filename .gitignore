@@ -19,6 +19,9 @@ notes.txt
 # Experiment outputs
 outputs/**/*.pkl
 outputs/**/*.csv
+outputs/**/*.txt
+outputs/**/*.log
+outputs/**/*.svg
 
 # Ad-hoc exported figures at the top level
 /*.png
@@ -27,3 +30,5 @@ latex/
 report/
 
 notes/
+mixed_beamer/
+mixed_report/

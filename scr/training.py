@@ -9,6 +9,9 @@ from scr.samplers import OfflineDataset
 from scr.world import SyntheticWorld
 
 
+_PAIR_RNG_OFFSET = 1_000_000
+
+
 @dataclass
 class TrainResult:
     method: str
@@ -18,6 +21,12 @@ class TrainResult:
     grad_weight_by_cluster: np.ndarray | None
     reference_values: np.ndarray | None = None
     final_theta: np.ndarray | None = None
+    world_rewards: np.ndarray | None = None
+    expected_quality_per_prompt: np.ndarray | None = None
+    expected_desirability_by_cluster: np.ndarray | None = None
+    theta_snapshots: np.ndarray | None = None
+    n_unary_per_cluster_seen: np.ndarray | None = None
+    n_pair_seen: np.ndarray | None = None
 
 
 def _adam_update(
@@ -67,6 +76,38 @@ def _kl_grad_to_theta(policy: np.ndarray) -> np.ndarray:
     return policy * (log_ratio - kl_per_prompt) / policy.shape[0]
 
 
+def _expected_quality_per_prompt(theta: np.ndarray, q: np.ndarray) -> np.ndarray:
+    return np.sum(softmax(theta) * q, axis=1)
+
+
+def _expected_desirability_by_cluster(
+    theta: np.ndarray,
+    q: np.ndarray,
+    world: SyntheticWorld,
+) -> np.ndarray:
+    policy = softmax(theta)
+    cfg = world.config
+    if cfg.n_clusters == 1:
+        thresholds = np.asarray([cfg.tau_a])
+        noise_rates = np.asarray([cfg.eps_a])
+    elif cfg.n_clusters == 2:
+        thresholds = np.asarray([cfg.tau_a, cfg.tau_b])
+        noise_rates = np.asarray([cfg.eps_a, cfg.eps_b])
+    else:
+        raise ValueError("expected desirability supports one or two annotator clusters")
+
+    values = []
+    for threshold, noise_rate in zip(thresholds, noise_rates):
+        clean_desirable = q > threshold
+        desirable_probability = np.where(clean_desirable, 1.0 - noise_rate, noise_rate)
+        values.append(float(np.mean(np.sum(policy * desirable_probability, axis=1))))
+    return np.asarray(values)
+
+
+def _cluster_count_array(logs: list[np.ndarray], n_clusters: int) -> np.ndarray:
+    return np.asarray(logs, dtype=np.int64).reshape(len(logs), n_clusters)
+
+
 def _pair_loss_grad(
     theta: np.ndarray,
     x: np.ndarray,
@@ -101,8 +142,14 @@ def _batch_sizes(train_config: TrainConfig) -> tuple[int, int]:
     if total_effort < 0:
         raise ValueError(f"total_effort must be non-negative, got {total_effort}")
 
-    n_unary = int((1.0 - train_config.pair_fraction) * total_effort)
-    n_pair = int(train_config.pair_fraction * total_effort / 2.0)
+    def stable_floor(value: float) -> int:
+        nearest_integer = round(value)
+        if np.isclose(value, nearest_integer, rtol=0.0, atol=1e-10):
+            return int(nearest_integer)
+        return int(value)
+
+    n_unary = stable_floor((1.0 - train_config.pair_fraction) * total_effort)
+    n_pair = stable_floor(train_config.pair_fraction * total_effort / 2.0)
     return n_unary, n_pair
 
 
@@ -195,7 +242,8 @@ def train_method(
         raise ValueError("dpo requires TrainConfig(alpha=1.0)")
 
     cfg = world.config
-    rng = np.random.default_rng(seed)
+    unary_rng = np.random.default_rng(seed)
+    pair_rng = np.random.default_rng(seed + _PAIR_RNG_OFFSET)
     theta = np.zeros((cfg.n_prompts, cfg.n_responses), dtype=np.float64)
     adam_m = np.zeros_like(theta)
     adam_v = np.zeros_like(theta)
@@ -210,8 +258,15 @@ def train_method(
 
     eval_steps = []
     eval_quality = []
+    eval_quality_per_prompt: list[np.ndarray] = []
+    eval_desirability_by_cluster: list[np.ndarray] = []
+    theta_snapshots: list[np.ndarray] = []
     grad_logs: list[list[float]] = []
     reference_logs: list[np.ndarray] = []
+    unary_seen = np.zeros(cfg.n_clusters, dtype=np.int64)
+    pair_seen = 0
+    unary_seen_logs: list[np.ndarray] = []
+    pair_seen_logs: list[int] = []
     random_cluster_rng = np.random.default_rng(seed + 89_999) if cluster_mode == "random" else None
 
     for step in range(train_config.steps):
@@ -223,7 +278,7 @@ def train_method(
 
         if n_unary > 0:
             x, y, desirable, true_cluster = world.sample_batch(
-                rng, n_unary, force_cluster=force_cluster
+                unary_rng, n_unary, force_cluster=force_cluster
             )
         else:
             x = np.empty(0, dtype=np.int64)
@@ -239,7 +294,7 @@ def train_method(
 
         if n_pair > 0:
             pair_x, pair_winner, pair_loser = world.sample_pair_batch(
-                rng,
+                pair_rng,
                 n_pair,
                 pair_noise=train_config.pair_noise,
             )
@@ -247,6 +302,12 @@ def train_method(
             pair_x = None
             pair_winner = None
             pair_loser = None
+
+        unary_seen += np.bincount(true_cluster, minlength=cfg.n_clusters)
+        if pair_x is not None:
+            pair_seen += len(pair_x)
+        unary_seen_logs.append(unary_seen.copy())
+        pair_seen_logs.append(pair_seen)
 
         policy = softmax(theta)
         rewards = np.log(policy[x, y]) + np.log(cfg.n_responses) if n_unary > 0 else np.empty(0)
@@ -284,6 +345,11 @@ def train_method(
             eval_steps.append(step)
             quality = expected_quality(theta, world.q)
             eval_quality.append(quality)
+            eval_quality_per_prompt.append(_expected_quality_per_prompt(theta, world.q))
+            eval_desirability_by_cluster.append(
+                _expected_desirability_by_cluster(theta, world.q, world)
+            )
+            theta_snapshots.append(theta.copy())
             if log_prefix is not None:
                 print(
                     f"{log_prefix} method={method} seed={seed} step={step} "
@@ -295,6 +361,11 @@ def train_method(
         eval_steps.append(train_config.steps)
         quality = expected_quality(theta, world.q)
         eval_quality.append(quality)
+        eval_quality_per_prompt.append(_expected_quality_per_prompt(theta, world.q))
+        eval_desirability_by_cluster.append(
+            _expected_desirability_by_cluster(theta, world.q, world)
+        )
+        theta_snapshots.append(theta.copy())
         if log_prefix is not None:
             print(
                 f"{log_prefix} method={method} seed={seed} step={train_config.steps} "
@@ -310,6 +381,12 @@ def train_method(
         grad_weight_by_cluster=np.asarray(grad_logs) if record_grad_weights else None,
         reference_values=np.asarray(reference_logs) if record_references else None,
         final_theta=theta.copy(),
+        world_rewards=world.q,
+        expected_quality_per_prompt=np.asarray(eval_quality_per_prompt),
+        expected_desirability_by_cluster=np.asarray(eval_desirability_by_cluster),
+        theta_snapshots=np.asarray(theta_snapshots),
+        n_unary_per_cluster_seen=_cluster_count_array(unary_seen_logs, cfg.n_clusters),
+        n_pair_seen=np.asarray(pair_seen_logs, dtype=np.int64),
     )
 
 
@@ -341,6 +418,12 @@ def train_offline_method(
 
     eval_steps = []
     eval_quality = []
+    eval_quality_per_prompt: list[np.ndarray] = []
+    eval_desirability_by_cluster: list[np.ndarray] = []
+    theta_snapshots: list[np.ndarray] = []
+    unary_seen = np.zeros(cfg.n_clusters, dtype=np.int64)
+    unary_seen_logs: list[np.ndarray] = []
+    pair_seen_logs: list[int] = []
 
     for step in range(train_config.steps):
         x, y, desirable, true_cluster, annotator = dataset.sample(train_config.batch_size)
@@ -359,11 +442,19 @@ def train_offline_method(
             theta, grad, adam_m, adam_v, step + 1, train_config.learning_rate
         )
         ref.update(rewards, x, ref_cluster, desirable, policy)
+        unary_seen += np.bincount(true_cluster, minlength=cfg.n_clusters)
+        unary_seen_logs.append(unary_seen.copy())
+        pair_seen_logs.append(0)
 
         if step % train_config.eval_every == 0:
             eval_steps.append(step)
             quality = expected_quality(theta, world.q)
             eval_quality.append(quality)
+            eval_quality_per_prompt.append(_expected_quality_per_prompt(theta, world.q))
+            eval_desirability_by_cluster.append(
+                _expected_desirability_by_cluster(theta, world.q, world)
+            )
+            theta_snapshots.append(theta.copy())
             if log_prefix is not None:
                 print(
                     f"{log_prefix} method={method} seed={seed} step={step} "
@@ -375,6 +466,11 @@ def train_offline_method(
         eval_steps.append(train_config.steps)
         quality = expected_quality(theta, world.q)
         eval_quality.append(quality)
+        eval_quality_per_prompt.append(_expected_quality_per_prompt(theta, world.q))
+        eval_desirability_by_cluster.append(
+            _expected_desirability_by_cluster(theta, world.q, world)
+        )
+        theta_snapshots.append(theta.copy())
         if log_prefix is not None:
             print(
                 f"{log_prefix} method={method} seed={seed} step={train_config.steps} "
@@ -390,4 +486,10 @@ def train_offline_method(
         grad_weight_by_cluster=None,
         reference_values=None,
         final_theta=theta.copy(),
+        world_rewards=world.q,
+        expected_quality_per_prompt=np.asarray(eval_quality_per_prompt),
+        expected_desirability_by_cluster=np.asarray(eval_desirability_by_cluster),
+        theta_snapshots=np.asarray(theta_snapshots),
+        n_unary_per_cluster_seen=_cluster_count_array(unary_seen_logs, cfg.n_clusters),
+        n_pair_seen=np.asarray(pair_seen_logs, dtype=np.int64),
     )

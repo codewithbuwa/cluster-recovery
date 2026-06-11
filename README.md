@@ -65,8 +65,7 @@ to update the CPO/KTO reference points `z` or `z_k`.
 
 For the `CPO_part2.pdf` Experiment 1 budget sweep, use
 `scr.training.valid_budget_sweep_cell` to skip method-budget combinations whose required data
-stream is empty. With `f in {0, 0.125, 0.25, 0.5, 0.75, 1.0}`, four methods, and two seeds, this
-leaves nineteen valid method-budget cells, or thirty-eight runs total.
+stream is empty.
 
 Example modes:
 
@@ -109,6 +108,8 @@ The default outputs are:
 - `outputs/exp_e/budget_sweep_deltas.png`
 - `outputs/exp_e/alpha_sweep_results.pkl`
 - `outputs/exp_e/alpha_sweep.png`
+- `outputs/exp_e/alpha_pair_sweep_results.pkl`
+- `outputs/exp_e/alpha_pair_sweep.png`
 - `outputs/exp_e/pia_sweep_results.pkl`
 - `outputs/exp_e/pia_sweep.png`
 - `outputs/exp_e/ref_ablation_results.pkl`

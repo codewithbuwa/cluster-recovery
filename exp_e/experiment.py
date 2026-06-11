@@ -47,6 +47,7 @@ def _run_method(
                 method=method,
                 seed=10_000 + seed,
                 train_config=train_config,
+                record_references=True,
                 log_prefix=log_prefix,
             )
         )
@@ -110,6 +111,38 @@ def run_alpha_sweep(config: ExperimentEConfig) -> dict[str, object]:
     }
 
 
+def run_alpha_pair_sweep(config: ExperimentEConfig) -> dict[str, object]:
+    results: dict[int, dict[float, list[TrainResult] | None]] = {}
+    for n_pair in config.pair_budget_values:
+        results[n_pair] = {}
+        for alpha in config.alpha_pair_values:
+            train = _with_budget(
+                config.train,
+                alpha=alpha,
+                n_unary=config.fixed_n_unary,
+                n_pair=n_pair,
+            )
+            method = "dpo" if alpha == 1.0 else "cpo"
+            results[n_pair][alpha] = _run_method(
+                config.world,
+                train,
+                method,
+                config.alpha_pair_seeds,
+                log_prefix=f"ALPHA-PAIR SWEEP N_pair={n_pair} alpha={alpha:g}",
+            )
+
+    return {
+        "name": "alpha_pair_sweep",
+        "world_config": config.world,
+        "train_config": config.train,
+        "seeds": config.alpha_pair_seeds,
+        "alpha_values": config.alpha_pair_values,
+        "pair_budget_values": config.pair_budget_values,
+        "fixed_n_unary": config.fixed_n_unary,
+        "results": results,
+    }
+
+
 def run_pia_sweep(config: ExperimentEConfig) -> dict[str, object]:
     results = {}
     for pi_a in config.pi_a_values:
@@ -148,8 +181,24 @@ def run_pia_sweep(config: ExperimentEConfig) -> dict[str, object]:
 
 def run_ref_ablation(config: ExperimentEConfig) -> dict[str, object]:
     cells = {
-        "global_alpha0": ("kto", _with_budget(config.train, alpha=0.0, n_unary=config.fixed_n_unary, n_pair=0)),
-        "cluster_alpha0": ("cpo", _with_budget(config.train, alpha=0.0, n_unary=config.fixed_n_unary, n_pair=0)),
+        "global_alpha0": (
+            "kto",
+            _with_budget(
+                config.train,
+                alpha=0.0,
+                n_unary=config.fixed_n_unary,
+                n_pair=config.fixed_n_pair,
+            ),
+        ),
+        "cluster_alpha0": (
+            "cpo",
+            _with_budget(
+                config.train,
+                alpha=0.0,
+                n_unary=config.fixed_n_unary,
+                n_pair=config.fixed_n_pair,
+            ),
+        ),
         "global_alpha05": (
             "kto",
             _with_budget(config.train, alpha=0.5, n_unary=config.fixed_n_unary, n_pair=config.fixed_n_pair),
@@ -159,9 +208,40 @@ def run_ref_ablation(config: ExperimentEConfig) -> dict[str, object]:
             _with_budget(config.train, alpha=0.5, n_unary=config.fixed_n_unary, n_pair=config.fixed_n_pair),
         ),
     }
+    secondary_n_pair = 8
+    secondary_cells = {
+        "global_alpha05": (
+            "kto",
+            _with_budget(
+                config.train,
+                alpha=0.5,
+                n_unary=config.fixed_n_unary,
+                n_pair=secondary_n_pair,
+            ),
+        ),
+        "cluster_alpha05": (
+            "cpo",
+            _with_budget(
+                config.train,
+                alpha=0.5,
+                n_unary=config.fixed_n_unary,
+                n_pair=secondary_n_pair,
+            ),
+        ),
+    }
     results = {
         label: _run_method(config.world, train, method, config.reference_seeds, log_prefix=f"REF ABLATION")
         for label, (method, train) in cells.items()
+    }
+    secondary_results = {
+        label: _run_method(
+            config.world,
+            train,
+            method,
+            config.reference_seeds,
+            log_prefix="REF ABLATION N_pair=8",
+        )
+        for label, (method, train) in secondary_cells.items()
     }
     return {
         "name": "ref_ablation",
@@ -170,5 +250,11 @@ def run_ref_ablation(config: ExperimentEConfig) -> dict[str, object]:
         "seeds": config.reference_seeds,
         "fixed_n_unary": config.fixed_n_unary,
         "fixed_n_pair": config.fixed_n_pair,
+        "nominal_primary_counts": {
+            "n_unary": config.fixed_n_unary,
+            "n_pair": config.fixed_n_pair,
+        },
+        "secondary_n_pair": secondary_n_pair,
         "results": results,
+        "secondary_results": secondary_results,
     }

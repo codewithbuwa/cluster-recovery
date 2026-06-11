@@ -22,8 +22,8 @@ COLORS = {
     "dpo": "mediumpurple",
     "global_alpha0": "steelblue",
     "cluster_alpha0": "darkorange",
-    "global_alpha05": "mediumseagreen",
-    "cluster_alpha05": "seagreen",
+    "global_alpha05": "steelblue",
+    "cluster_alpha05": "darkorange",
 }
 
 
@@ -128,6 +128,56 @@ def plot_alpha_sweep(payload: dict[str, object], output_path: Path) -> None:
     plt.close(fig)
 
 
+def plot_alpha_pair_sweep(payload: dict[str, object], output_path: Path) -> None:
+    pair_budgets = list(payload["pair_budget_values"])
+    alpha_values = list(payload["alpha_values"])
+    colors = plt.cm.viridis(np.linspace(0.2, 0.9, len(pair_budgets)))
+    best_alphas = []
+
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.0))
+    for n_pair, color in zip(pair_budgets, colors):
+        means = [
+            _mean_std(payload["results"][n_pair][alpha])[0] for alpha in alpha_values
+        ]
+        means_array = np.asarray(means)
+        best_alphas.append(alpha_values[int(np.nanargmax(means_array))])
+        axes[0].plot(
+            alpha_values,
+            means_array,
+            marker="o",
+            linewidth=2,
+            color=color,
+            label=f"N_pair = {n_pair}",
+        )
+
+    axes[0].set_xlabel("Loss mixing alpha")
+    axes[0].set_ylabel("Final E[q]")
+    axes[0].set_title("Alpha curves by pair budget")
+    axes[0].grid(alpha=0.25)
+    axes[0].legend(frameon=False, fontsize=8)
+
+    axes[1].plot(
+        pair_budgets,
+        best_alphas,
+        marker="o",
+        linewidth=2,
+        color=COLORS["mixed_cpo"],
+    )
+    axes[1].set_xscale("log")
+    axes[1].set_xticks(pair_budgets, [str(value) for value in pair_budgets])
+    axes[1].set_xlabel("Pair labels per step N_pair (log scale)")
+    axes[1].set_ylabel("Optimal mixing alpha*")
+    axes[1].set_title("Optimal alpha by pair budget")
+    axes[1].set_ylim(-0.03, 1.03)
+    axes[1].set_yticks(alpha_values)
+    axes[1].grid(alpha=0.25)
+
+    fig.suptitle(f"Optimal alpha vs. pair budget (N_unary = {payload['fixed_n_unary']})")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=220)
+    plt.close(fig)
+
+
 def plot_pia_sweep(payload: dict[str, object], output_path: Path) -> None:
     pi_values = list(payload["pi_a_values"])
     fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.0), sharex=True)
@@ -196,12 +246,57 @@ def plot_ref_ablation(payload: dict[str, object], output_path: Path) -> None:
     plt.close(fig)
 
 
+def plot_ref_ablation_pair8(payload: dict[str, object], output_path: Path) -> None:
+    primary = payload["results"]
+    secondary = payload["secondary_results"]
+    pair_budgets = (payload["secondary_n_pair"], payload["fixed_n_pair"])
+    global_runs = (secondary["global_alpha05"], primary["global_alpha05"])
+    cluster_runs = (secondary["cluster_alpha05"], primary["cluster_alpha05"])
+    global_means, global_stds = zip(*[_mean_std(runs) for runs in global_runs])
+    cluster_means, cluster_stds = zip(*[_mean_std(runs) for runs in cluster_runs])
+
+    x = np.arange(len(pair_budgets))
+    width = 0.34
+    fig, ax = plt.subplots(figsize=(7.0, 4.5))
+    global_bars = ax.bar(
+        x - width / 2,
+        global_means,
+        width,
+        yerr=global_stds,
+        capsize=5,
+        color=COLORS["global_alpha05"],
+        label="Global z",
+    )
+    cluster_bars = ax.bar(
+        x + width / 2,
+        cluster_means,
+        width,
+        yerr=cluster_stds,
+        capsize=5,
+        color=COLORS["cluster_alpha05"],
+        label="Per-cluster z_k",
+    )
+    ax.bar_label(global_bars, fmt="%.3f", padding=3, fontsize=8)
+    ax.bar_label(cluster_bars, fmt="%.3f", padding=3, fontsize=8)
+    ax.set_xticks(x, [f"N_pair={value}" for value in pair_budgets])
+    ax.set_title("Cluster-reference gain at alpha=0.5")
+    ax.set_ylabel("Final E[q]")
+    ax.set_ylim(0.55, 1.0)
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=220)
+    plt.close(fig)
+
+
 def plot(payload: dict[str, object], output_path: Path) -> None:
     name = payload["name"]
     if name == "budget_sweep":
         plot_budget_sweep(payload, output_path)
     elif name == "alpha_sweep":
         plot_alpha_sweep(payload, output_path)
+    elif name == "alpha_pair_sweep":
+        plot_alpha_pair_sweep(payload, output_path)
     elif name == "pia_sweep":
         plot_pia_sweep(payload, output_path)
     elif name == "ref_ablation":

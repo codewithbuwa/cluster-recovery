@@ -8,13 +8,20 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from exp_e.config import ExperimentEConfig
-from exp_e.experiment import run_alpha_sweep, run_budget_sweep, run_pia_sweep, run_ref_ablation
+from exp_e.experiment import (
+    run_alpha_pair_sweep,
+    run_alpha_sweep,
+    run_budget_sweep,
+    run_pia_sweep,
+    run_ref_ablation,
+)
 from exp_e.summary import summarize
 
 
 RUNNERS = {
     "budget_sweep": run_budget_sweep,
     "alpha_sweep": run_alpha_sweep,
+    "alpha_pair_sweep": run_alpha_pair_sweep,
     "pia_sweep": run_pia_sweep,
     "ref_ablation": run_ref_ablation,
 }
@@ -30,6 +37,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--budget-sweep", action="store_true", help="Run the pairwise-effort budget sweep.")
     parser.add_argument("--alpha-sweep", action="store_true", help="Run the fixed-budget alpha sweep.")
+    parser.add_argument(
+        "--alpha-pair-sweep",
+        action="store_true",
+        help="Estimate the optimal alpha as a function of the pairwise sample budget.",
+    )
     parser.add_argument("--pia-sweep", action="store_true", help="Run the pi_A heterogeneity sweep.")
     parser.add_argument("--ref-ablation", action="store_true", help="Run the global-vs-cluster reference ablation.")
     parser.add_argument(
@@ -46,6 +58,8 @@ def _selected_names(args: argparse.Namespace) -> list[str]:
         names.append("budget_sweep")
     if args.alpha_sweep:
         names.append("alpha_sweep")
+    if args.alpha_pair_sweep:
+        names.append("alpha_pair_sweep")
     if args.pia_sweep:
         names.append("pia_sweep")
     if args.ref_ablation:
@@ -85,20 +99,39 @@ def main() -> None:
         print(f"Saved summary: {summary_path}")
 
         if not args.skip_plot:
-            from exp_e.plotting import plot, plot_budget_sweep_deltas
-            from scr.artifacts import copy_to_latex_images
+            from exp_e.plotting import (
+                plot,
+                plot_budget_sweep_deltas,
+                plot_ref_ablation_pair8,
+            )
+            from scr.artifacts import copy_to_latex_images, copy_to_mixed_images
 
             plot(payload, figure_path)
             latex_figure_path = copy_to_latex_images(figure_path)
+            mixed_figure_paths = copy_to_mixed_images(figure_path)
             print(f"Saved figure: {figure_path}")
             print(f"Saved LaTeX figure: {latex_figure_path}")
+            for mixed_figure_path in mixed_figure_paths:
+                print(f"Saved mixed figure: {mixed_figure_path}")
 
             if name == "budget_sweep":
                 delta_figure_path = output_dir / "budget_sweep_deltas.png"
                 plot_budget_sweep_deltas(payload, delta_figure_path)
                 latex_delta_figure_path = copy_to_latex_images(delta_figure_path)
+                mixed_delta_figure_paths = copy_to_mixed_images(delta_figure_path)
                 print(f"Saved delta figure: {delta_figure_path}")
                 print(f"Saved LaTeX delta figure: {latex_delta_figure_path}")
+                for mixed_delta_figure_path in mixed_delta_figure_paths:
+                    print(f"Saved mixed delta figure: {mixed_delta_figure_path}")
+            elif name == "ref_ablation":
+                pair8_figure_path = output_dir / "ref_ablation_pair8.png"
+                plot_ref_ablation_pair8(payload, pair8_figure_path)
+                latex_pair8_figure_path = copy_to_latex_images(pair8_figure_path)
+                mixed_pair8_figure_paths = copy_to_mixed_images(pair8_figure_path)
+                print(f"Saved N_pair=8 figure: {pair8_figure_path}")
+                print(f"Saved LaTeX N_pair=8 figure: {latex_pair8_figure_path}")
+                for mixed_pair8_figure_path in mixed_pair8_figure_paths:
+                    print(f"Saved mixed N_pair=8 figure: {mixed_pair8_figure_path}")
 
 
 if __name__ == "__main__":
