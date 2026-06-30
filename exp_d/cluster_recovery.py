@@ -13,6 +13,7 @@ from exp_d.plotting import (
     plot_learned_replacement_panel,
     plot_panel_b,
 )
+from scr.artifacts import copy_to_latex_and_beamer_images
 
 
 def parse_args() -> argparse.Namespace:
@@ -86,7 +87,9 @@ def render_all(payload: dict[str, object], output_dir: Path) -> list[Path]:
 def main() -> None:
     args = parse_args()
     payload = load_bundle(args.bundle)
-    render_all(payload, args.output_dir)
+    for figure_path in render_all(payload, args.output_dir):
+        for presentation_path in copy_to_latex_and_beamer_images(figure_path):
+            print(f"Saved presentation figure: {presentation_path}")
 
 
 if __name__ == "__main__":

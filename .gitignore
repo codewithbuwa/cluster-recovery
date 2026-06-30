@@ -32,3 +32,9 @@ report/
 notes/
 mixed_beamer/
 mixed_report/
+beamer/
+CPO_presentation/
+SKILL.md
+conventions.md
+
+random_90_cluster_experiment.py

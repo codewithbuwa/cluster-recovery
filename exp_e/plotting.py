@@ -246,12 +246,11 @@ def plot_ref_ablation(payload: dict[str, object], output_path: Path) -> None:
     plt.close(fig)
 
 
-def plot_ref_ablation_pair8(payload: dict[str, object], output_path: Path) -> None:
-    primary = payload["results"]
+def plot_ref_ablation_secondary(payload: dict[str, object], output_path: Path) -> None:
     secondary = payload["secondary_results"]
-    pair_budgets = (payload["secondary_n_pair"], payload["fixed_n_pair"])
-    global_runs = (secondary["global_alpha05"], primary["global_alpha05"])
-    cluster_runs = (secondary["cluster_alpha05"], primary["cluster_alpha05"])
+    pair_budgets = payload["secondary_n_pair_values"]
+    global_runs = [secondary[n_pair]["global"] for n_pair in pair_budgets]
+    cluster_runs = [secondary[n_pair]["cluster"] for n_pair in pair_budgets]
     global_means, global_stds = zip(*[_mean_std(runs) for runs in global_runs])
     cluster_means, cluster_stds = zip(*[_mean_std(runs) for runs in cluster_runs])
 
@@ -278,8 +277,8 @@ def plot_ref_ablation_pair8(payload: dict[str, object], output_path: Path) -> No
     )
     ax.bar_label(global_bars, fmt="%.3f", padding=3, fontsize=8)
     ax.bar_label(cluster_bars, fmt="%.3f", padding=3, fontsize=8)
-    ax.set_xticks(x, [f"N_pair={value}" for value in pair_budgets])
-    ax.set_title("Cluster-reference gain at alpha=0.5")
+    ax.set_xticks(x, [f"N_pair={n_pair}" for n_pair in pair_budgets])
+    ax.set_title(f"Cluster-reference gain at alpha={payload['secondary_alpha']}")
     ax.set_ylabel("Final E[q]")
     ax.set_ylim(0.55, 1.0)
     ax.grid(axis="y", alpha=0.25)

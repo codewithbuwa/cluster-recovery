@@ -95,10 +95,6 @@ def summarize_ref_ablation(payload: dict[str, object]) -> str:
     secondary = payload["secondary_results"]
     cluster_gain_unary = _values(results["cluster_alpha0"]).mean() - _values(results["global_alpha0"]).mean()
     cluster_gain_mixed = _values(results["cluster_alpha05"]).mean() - _values(results["global_alpha05"]).mean()
-    cluster_gain_mixed_pair8 = (
-        _values(secondary["cluster_alpha05"]).mean()
-        - _values(secondary["global_alpha05"]).mean()
-    )
     mixing_gain_global = _values(results["global_alpha05"]).mean() - _values(results["global_alpha0"]).mean()
     mixing_gain_cluster = _values(results["cluster_alpha05"]).mean() - _values(results["cluster_alpha0"]).mean()
     lines = [
@@ -114,16 +110,53 @@ def summarize_ref_ablation(payload: dict[str, object]) -> str:
         f"Mixing gain, global:  {mixing_gain_global:.4f}",
         f"Mixing gain, cluster: {mixing_gain_cluster:.4f}",
         "",
-        f"Secondary check, N_pair={payload['secondary_n_pair']}, alpha=0.5",
-        f"global z:             {_mean_std(secondary['global_alpha05'])}",
-        f"cluster z_k:          {_mean_std(secondary['cluster_alpha05'])}",
-        f"Cluster gain, mixed:  {cluster_gain_mixed_pair8:.4f}",
-        "",
-        "Primary nominal design: "
-        f"N_unary={payload['nominal_primary_counts']['n_unary']}, "
-        f"N_pair={payload['nominal_primary_counts']['n_pair']}. "
-        "At alpha=0, the zero-weight pair batch is not sampled.",
+        f"Secondary checks, alpha={payload['secondary_alpha']}",
     ]
+    for n_pair in payload["secondary_n_pair_values"]:
+        row = secondary[n_pair]
+        cluster_gain = _values(row["cluster"]).mean() - _values(row["global"]).mean()
+        lines.extend(
+            [
+                f"N_pair={n_pair}",
+                f"    global z:            {_mean_std(row['global'])}",
+                f"    cluster z_k:         {_mean_std(row['cluster'])}",
+                f"    Cluster gain, mixed: {cluster_gain:.4f}",
+            ]
+        )
+    lines.extend(
+        [
+            "",
+            "Primary nominal design: "
+            f"N_unary={payload['nominal_primary_counts']['n_unary']}, "
+            f"N_pair={payload['nominal_primary_counts']['n_pair']}. "
+            "At alpha=0, the zero-weight pair batch is not sampled.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
+def render_ref_ablation_low_pair_table(payload: dict[str, object]) -> str:
+    secondary = payload["secondary_results"]
+    lines = [
+        "\\begin{table}[tbp]",
+        "\\centering",
+        f"\\caption{{Low-pair reference ablation at \\(\\alpha={payload['secondary_alpha']:.2f}\\).}}",
+        "\\begin{tabular}{rccc}",
+        "\\toprule",
+        "\\(N_{\\mathrm{pair}}\\) & Global \\(z\\) & Per-cluster \\(z_k\\) & Cluster gain\\\\",
+        "\\midrule",
+    ]
+    for n_pair in payload["secondary_n_pair_values"]:
+        row = secondary[n_pair]
+        global_values = _values(row["global"])
+        cluster_values = _values(row["cluster"])
+        cluster_gain = cluster_values.mean() - global_values.mean()
+        lines.append(
+            f"{n_pair} & {global_values.mean():.4f} \\(\\pm\\) {global_values.std():.4f} "
+            f"& {cluster_values.mean():.4f} \\(\\pm\\) {cluster_values.std():.4f} "
+            f"& {cluster_gain:.4f}\\\\"
+        )
+    lines.extend(["\\bottomrule", "\\end{tabular}", "\\end{table}"])
     return "\n".join(lines) + "\n"
 
 

@@ -230,6 +230,7 @@ def train_method(
     force_cluster: int | None = None,
     reference_variant: str = "undesirable",
     cluster_mode: str = "true",
+    pair_mode: str = "global",
     log_prefix: str | None = None,
 ) -> TrainResult:
     if method not in {"kto", "cpo", "dpo"}:
@@ -238,6 +239,8 @@ def train_method(
         raise ValueError(f"unknown reference variant: {reference_variant}")
     if cluster_mode not in {"true", "random"}:
         raise ValueError(f"unknown cluster mode: {cluster_mode}")
+    if pair_mode not in {"global", "in_cluster"}:
+        raise ValueError(f"unknown pair mode: {pair_mode}")
     if method == "dpo" and train_config.alpha != 1.0:
         raise ValueError("dpo requires TrainConfig(alpha=1.0)")
 
@@ -292,11 +295,16 @@ def train_method(
             cpo_cluster = true_cluster
         ref_cluster = cpo_cluster if method == "cpo" else np.zeros_like(true_cluster)
 
-        if n_pair > 0:
+        if n_pair > 0 and pair_mode == "global":
             pair_x, pair_winner, pair_loser = world.sample_pair_batch(
                 pair_rng,
                 n_pair,
                 pair_noise=train_config.pair_noise,
+            )
+        elif n_pair > 0:
+            pair_x, pair_winner, pair_loser, _pair_cluster = world.sample_in_cluster_pair_batch(
+                pair_rng,
+                n_pair,
             )
         else:
             pair_x = None

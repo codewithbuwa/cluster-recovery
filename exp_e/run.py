@@ -14,8 +14,11 @@ from exp_e.experiment import (
     run_budget_sweep,
     run_pia_sweep,
     run_ref_ablation,
+    SECONDARY_ALPHA,
 )
 from exp_e.summary import summarize
+from exp_e.summary import render_ref_ablation_low_pair_table
+from scr.plot_env import configure_matplotlib_cache
 
 
 RUNNERS = {
@@ -25,6 +28,10 @@ RUNNERS = {
     "pia_sweep": run_pia_sweep,
     "ref_ablation": run_ref_ablation,
 }
+
+
+def _alpha_image_tag(alpha: float) -> str:
+    return f"{alpha:g}".replace(".", "")
 
 
 def parse_args() -> argparse.Namespace:
@@ -98,11 +105,17 @@ def main() -> None:
         print(summary)
         print(f"Saved summary: {summary_path}")
 
+        if name == "ref_ablation":
+            low_pair_path = output_dir.parents[1] / "mixed_report" / "ref_ablation_low_pair.tex"
+            low_pair_path.write_text(render_ref_ablation_low_pair_table(payload))
+            print(f"Saved low-pair table: {low_pair_path}")
+
         if not args.skip_plot:
+            configure_matplotlib_cache()
             from exp_e.plotting import (
                 plot,
                 plot_budget_sweep_deltas,
-                plot_ref_ablation_pair8,
+                plot_ref_ablation_secondary,
             )
             from scr.artifacts import copy_to_latex_images, copy_to_mixed_images
 
@@ -112,7 +125,7 @@ def main() -> None:
             print(f"Saved figure: {figure_path}")
             print(f"Saved LaTeX figure: {latex_figure_path}")
             for mixed_figure_path in mixed_figure_paths:
-                print(f"Saved mixed figure: {mixed_figure_path}")
+                print(f"Saved presentation figure: {mixed_figure_path}")
 
             if name == "budget_sweep":
                 delta_figure_path = output_dir / "budget_sweep_deltas.png"
@@ -122,16 +135,16 @@ def main() -> None:
                 print(f"Saved delta figure: {delta_figure_path}")
                 print(f"Saved LaTeX delta figure: {latex_delta_figure_path}")
                 for mixed_delta_figure_path in mixed_delta_figure_paths:
-                    print(f"Saved mixed delta figure: {mixed_delta_figure_path}")
+                    print(f"Saved presentation delta figure: {mixed_delta_figure_path}")
             elif name == "ref_ablation":
-                pair8_figure_path = output_dir / "ref_ablation_pair8.png"
-                plot_ref_ablation_pair8(payload, pair8_figure_path)
-                latex_pair8_figure_path = copy_to_latex_images(pair8_figure_path)
-                mixed_pair8_figure_paths = copy_to_mixed_images(pair8_figure_path)
-                print(f"Saved N_pair=8 figure: {pair8_figure_path}")
-                print(f"Saved LaTeX N_pair=8 figure: {latex_pair8_figure_path}")
-                for mixed_pair8_figure_path in mixed_pair8_figure_paths:
-                    print(f"Saved mixed N_pair=8 figure: {mixed_pair8_figure_path}")
+                secondary_figure_path = output_dir / f"ref_ablation_alpha{_alpha_image_tag(SECONDARY_ALPHA)}.png"
+                plot_ref_ablation_secondary(payload, secondary_figure_path)
+                latex_secondary_figure_path = copy_to_latex_images(secondary_figure_path)
+                mixed_secondary_figure_paths = copy_to_mixed_images(secondary_figure_path)
+                print(f"Saved alpha={SECONDARY_ALPHA:g} figure: {secondary_figure_path}")
+                print(f"Saved LaTeX alpha={SECONDARY_ALPHA:g} figure: {latex_secondary_figure_path}")
+                for mixed_secondary_figure_path in mixed_secondary_figure_paths:
+                    print(f"Saved presentation alpha={SECONDARY_ALPHA:g} figure: {mixed_secondary_figure_path}")
 
 
 if __name__ == "__main__":

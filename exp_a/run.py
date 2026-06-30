@@ -10,9 +10,13 @@ if __package__ is None or __package__ == "":
 
 from exp_a.config import ExperimentAConfig
 from exp_a.experiment import run_experiment_a
+from scr.plot_env import configure_matplotlib_cache
+
+configure_matplotlib_cache()
+
 from exp_a.plotting import plot_experiment_a
 from exp_a.summary import summarize
-from scr.artifacts import copy_to_latex_images
+from scr.artifacts import copy_to_latex_and_beamer_images
 
 
 def parse_args() -> argparse.Namespace:
@@ -86,14 +90,15 @@ def main() -> None:
 
     if not args.skip_plot:
         plot_experiment_a(payload, figure_path)
-        latex_figure_path = copy_to_latex_images(figure_path)
+        presentation_figure_paths = copy_to_latex_and_beamer_images(figure_path)
 
     summary = summarize(payload)
     print(summary)
     print(f"Saved cache: {cache_path}")
     if not args.skip_plot:
         print(f"Saved figure: {figure_path}")
-        print(f"Saved LaTeX figure: {latex_figure_path}")
+        for presentation_figure_path in presentation_figure_paths:
+            print(f"Saved presentation figure: {presentation_figure_path}")
 
 
 if __name__ == "__main__":

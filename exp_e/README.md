@@ -50,11 +50,11 @@ reference in {global, per-cluster}
 
 When `alpha=0`, training does not consume pair batches because the pairwise loss is disabled; the
 declared data budget is nevertheless unchanged across the primary cells. A secondary mixed
-control repeats the global/per-cluster comparison at `N_pair=8` and `alpha=0.5`.
+control repeats the global/per-cluster comparison at `N_pair` in `{4, 8}` and `alpha=0.125`.
 
 ```text
 outputs/exp_e/ref_ablation.png
-outputs/exp_e/ref_ablation_pair8.png
+outputs/exp_e/ref_ablation_alpha0125.png
 outputs/exp_e/ref_ablation_summary.txt
 outputs/exp_e/ref_ablation_results.pkl
 ```

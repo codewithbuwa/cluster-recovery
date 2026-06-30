@@ -5,7 +5,7 @@ from scr.config import TrainConfig, WorldConfig
 from scr.training import TrainResult, train_method, valid_budget_sweep_cell
 from scr.world import SyntheticWorld
 
-
+SECONDARY_ALPHA = 0.25
 METHOD_SPECS = {
     "kto": ("kto", 0.0),
     "cpo": ("cpo", 0.0),
@@ -36,6 +36,7 @@ def _run_method(
     train_config: TrainConfig,
     method: str,
     seeds: tuple[int, ...],
+    pair_mode: str,
     log_prefix: str | None = None,
 ) -> list[TrainResult]:
     runs = []
@@ -48,6 +49,7 @@ def _run_method(
                 seed=10_000 + seed,
                 train_config=train_config,
                 record_references=True,
+                pair_mode=pair_mode,
                 log_prefix=log_prefix,
             )
         )
@@ -55,6 +57,7 @@ def _run_method(
 
 
 def run_budget_sweep(config: ExperimentEConfig) -> dict[str, object]:
+    pair_mode = "in_cluster"
     results: dict[float, dict[str, list[TrainResult] | None]] = {}
     for pair_fraction in config.pair_fraction_values:
         n_unary, n_pair = _budget_counts(config.effort, pair_fraction)
@@ -70,6 +73,7 @@ def run_budget_sweep(config: ExperimentEConfig) -> dict[str, object]:
                 train,
                 method,
                 config.budget_seeds,
+                pair_mode,
                 log_prefix=f"BUDGET SWEEP f={pair_fraction:g}",
             )
 
@@ -79,12 +83,14 @@ def run_budget_sweep(config: ExperimentEConfig) -> dict[str, object]:
         "train_config": config.train,
         "seeds": config.budget_seeds,
         "effort": config.effort,
+        "pair_mode": pair_mode,
         "pair_fraction_values": config.pair_fraction_values,
         "results": results,
     }
 
 
 def run_alpha_sweep(config: ExperimentEConfig) -> dict[str, object]:
+    pair_mode = "in_cluster"
     results = {}
     for alpha in config.alpha_values:
         n_unary = 0 if alpha == 1.0 else config.fixed_n_unary
@@ -96,6 +102,7 @@ def run_alpha_sweep(config: ExperimentEConfig) -> dict[str, object]:
             train,
             method,
             config.alpha_seeds,
+            pair_mode,
             log_prefix=f"ALPHA SWEEP alpha={alpha:g}",
         )
 
@@ -107,11 +114,13 @@ def run_alpha_sweep(config: ExperimentEConfig) -> dict[str, object]:
         "alpha_values": config.alpha_values,
         "fixed_n_unary": config.fixed_n_unary,
         "fixed_n_pair": config.fixed_n_pair,
+        "pair_mode": pair_mode,
         "results": results,
     }
 
 
 def run_alpha_pair_sweep(config: ExperimentEConfig) -> dict[str, object]:
+    pair_mode = "in_cluster"
     results: dict[int, dict[float, list[TrainResult] | None]] = {}
     for n_pair in config.pair_budget_values:
         results[n_pair] = {}
@@ -128,6 +137,7 @@ def run_alpha_pair_sweep(config: ExperimentEConfig) -> dict[str, object]:
                 train,
                 method,
                 config.alpha_pair_seeds,
+                pair_mode,
                 log_prefix=f"ALPHA-PAIR SWEEP N_pair={n_pair} alpha={alpha:g}",
             )
 
@@ -139,11 +149,13 @@ def run_alpha_pair_sweep(config: ExperimentEConfig) -> dict[str, object]:
         "alpha_values": config.alpha_pair_values,
         "pair_budget_values": config.pair_budget_values,
         "fixed_n_unary": config.fixed_n_unary,
+        "pair_mode": pair_mode,
         "results": results,
     }
 
 
 def run_pia_sweep(config: ExperimentEConfig) -> dict[str, object]:
+    pair_mode = "in_cluster"
     results = {}
     for pi_a in config.pi_a_values:
         world_config = replace(config.world, pi_a=pi_a, tau_a=0.25, tau_b=0.75, eps_a=0.05, eps_b=0.05)
@@ -163,6 +175,7 @@ def run_pia_sweep(config: ExperimentEConfig) -> dict[str, object]:
                 train,
                 method,
                 config.pia_seeds,
+                pair_mode,
                 log_prefix=f"PI_A SWEEP pi_A={pi_a:g}",
             )
 
@@ -175,11 +188,13 @@ def run_pia_sweep(config: ExperimentEConfig) -> dict[str, object]:
         "effort": config.effort,
         "fixed_n_unary": config.fixed_n_unary,
         "fixed_n_pair": config.fixed_n_pair,
+        "pair_mode": pair_mode,
         "results": results,
     }
 
 
 def run_ref_ablation(config: ExperimentEConfig) -> dict[str, object]:
+    pair_mode = "in_cluster"
     cells = {
         "global_alpha0": (
             "kto",
@@ -208,40 +223,30 @@ def run_ref_ablation(config: ExperimentEConfig) -> dict[str, object]:
             _with_budget(config.train, alpha=0.5, n_unary=config.fixed_n_unary, n_pair=config.fixed_n_pair),
         ),
     }
-    secondary_n_pair = 8
-    secondary_cells = {
-        "global_alpha05": (
-            "kto",
-            _with_budget(
-                config.train,
-                alpha=0.5,
-                n_unary=config.fixed_n_unary,
-                n_pair=secondary_n_pair,
-            ),
-        ),
-        "cluster_alpha05": (
-            "cpo",
-            _with_budget(
-                config.train,
-                alpha=0.5,
-                n_unary=config.fixed_n_unary,
-                n_pair=secondary_n_pair,
-            ),
-        ),
-    }
+    secondary_n_pair_values = (4, 8)
+    secondary_alpha = SECONDARY_ALPHA
     results = {
-        label: _run_method(config.world, train, method, config.reference_seeds, log_prefix=f"REF ABLATION")
+        label: _run_method(config.world, train, method, config.reference_seeds, pair_mode, log_prefix=f"REF ABLATION")
         for label, (method, train) in cells.items()
     }
     secondary_results = {
-        label: _run_method(
-            config.world,
-            train,
-            method,
-            config.reference_seeds,
-            log_prefix="REF ABLATION N_pair=8",
-        )
-        for label, (method, train) in secondary_cells.items()
+        n_pair: {
+            label: _run_method(
+                config.world,
+                _with_budget(
+                    config.train,
+                    alpha=secondary_alpha,
+                    n_unary=config.fixed_n_unary,
+                    n_pair=n_pair,
+                ),
+                method,
+                config.reference_seeds,
+                pair_mode,
+                log_prefix=f"REF ABLATION N_pair={n_pair} alpha={secondary_alpha}",
+            )
+            for label, method in (("global", "kto"), ("cluster", "cpo"))
+        }
+        for n_pair in secondary_n_pair_values
     }
     return {
         "name": "ref_ablation",
@@ -254,7 +259,9 @@ def run_ref_ablation(config: ExperimentEConfig) -> dict[str, object]:
             "n_unary": config.fixed_n_unary,
             "n_pair": config.fixed_n_pair,
         },
-        "secondary_n_pair": secondary_n_pair,
+        "secondary_n_pair_values": secondary_n_pair_values,
+        "secondary_alpha": secondary_alpha,
+        "pair_mode": pair_mode,
         "results": results,
         "secondary_results": secondary_results,
     }

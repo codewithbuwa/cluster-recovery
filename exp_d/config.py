@@ -16,6 +16,6 @@ class ExperimentDConfig:
         samples_per_annotator=40,
     )
     train: TrainConfig = TrainConfig(steps=250, batch_size=128, learning_rate=0.2)
-    seeds: tuple[int, ...] = (0, 1, 2)
+    seeds: tuple[int, ...] = range(10)
     k_values: tuple[int, ...] = (1, 2, 3, 5, 10)
     output_dir: Path = Path("outputs/exp_d/")

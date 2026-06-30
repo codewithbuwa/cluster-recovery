@@ -68,3 +68,56 @@ class SyntheticWorld:
         noisy_winner = np.where(flips, y_loser, y_winner)
         noisy_loser = np.where(flips, y_winner, y_loser)
         return x, noisy_winner, noisy_loser
+
+    def sample_in_cluster_pair_batch(
+        self,
+        rng: np.random.Generator,
+        batch_size: int,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Sample same-prompt, same-cluster desirable/undesirable pairs."""
+        cfg = self.config
+        xs: list[np.ndarray] = []
+        y_desirable: list[np.ndarray] = []
+        y_undesirable: list[np.ndarray] = []
+        clusters: list[np.ndarray] = []
+        remaining = batch_size
+
+        while remaining > 0:
+            candidate_size = max(remaining * 4, 32)
+            x = rng.integers(0, cfg.n_prompts, size=candidate_size)
+            y_a = rng.integers(0, cfg.n_responses, size=candidate_size)
+            y_b = rng.integers(0, cfg.n_responses - 1, size=candidate_size)
+            y_b = np.where(y_b >= y_a, y_b + 1, y_b)
+
+            if cfg.n_clusters == 1:
+                c = np.zeros(candidate_size, dtype=np.int64)
+            elif cfg.n_clusters == 2:
+                c = rng.binomial(1, 1.0 - cfg.pi_a, size=candidate_size).astype(np.int64)
+            else:
+                raise ValueError("in-cluster pair sampling supports one or two clusters")
+
+            label_a = self.label(x, y_a, c, rng)
+            label_b = self.label(x, y_b, c, rng)
+            usable = label_a != label_b
+            if not np.any(usable):
+                continue
+
+            take = np.flatnonzero(usable)[:remaining]
+            x_take = x[take]
+            c_take = c[take]
+            a_desirable = label_a[take] == 1
+            y_d = np.where(a_desirable, y_a[take], y_b[take])
+            y_u = np.where(a_desirable, y_b[take], y_a[take])
+
+            xs.append(x_take)
+            y_desirable.append(y_d)
+            y_undesirable.append(y_u)
+            clusters.append(c_take)
+            remaining -= len(take)
+
+        return (
+            np.concatenate(xs),
+            np.concatenate(y_desirable),
+            np.concatenate(y_undesirable),
+            np.concatenate(clusters),
+        )

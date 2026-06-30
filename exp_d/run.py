@@ -8,10 +8,14 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from exp_d.config import ExperimentDConfig
+from scr.plot_env import configure_matplotlib_cache
+
+configure_matplotlib_cache()
+
 from exp_d.cluster_recovery import render_all
 from exp_d.experiment import run_experiment_d
 from exp_d.online_flows import OnlineFlowConfig, run_online_flows, run_online_variant_panel
-from scr.artifacts import copy_to_latex_images
+from scr.artifacts import copy_to_latex_and_beamer_images
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,11 +68,15 @@ def main() -> None:
 
     if not args.skip_plot:
         figure_paths = render_all(bundle, output_dir)
-        latex_figure_paths = [copy_to_latex_images(path) for path in figure_paths]
+        presentation_figure_paths = [
+            copied_path
+            for figure_path in figure_paths
+            for copied_path in copy_to_latex_and_beamer_images(figure_path)
+        ]
 
     if not args.skip_plot:
-        for latex_figure_path in latex_figure_paths:
-            print(f"Saved LaTeX figure: {latex_figure_path}")
+        for presentation_figure_path in presentation_figure_paths:
+            print(f"Saved presentation figure: {presentation_figure_path}")
 
 
 if __name__ == "__main__":
